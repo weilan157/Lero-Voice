@@ -71,3 +71,7 @@ Testing/
 # local scratch (pip temp leftovers, pdf extraction, etc.)
 .tmp/
 
+# IDE / Editor configuration
+.vscode/
+.clangd
+
