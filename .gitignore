@@ -67,3 +67,7 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# local scratch (pip temp leftovers, pdf extraction, etc.)
+.tmp/
+
