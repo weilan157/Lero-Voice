@@ -632,6 +632,36 @@ components/diag/
 
 ---
 
+### 3.9 语音助手（LLM 理解）方案选型（已定方向）
+
+> **结论：云端 API 为主，内嵌不可行，本地+云端混合。**
+> 设备端 PSRAM 仅 16 MB（最小可用 LLM int4 量化 ≥ 100 MB）且无 NPU，
+> 大模型理解必须走云端；本地只做唤醒词 / VAD / 小词表命令。
+
+```
+本地层: WakeNet 唤醒 → AFE(AEC/NS) → VAD 端点检测
+   ├─ 关键词意图（本地词表）→ 直接执行（smarthome/player，零延迟、离线可用）
+   └─ 开放对话 → 录音上传（WebSocket）→ 云端
+云端层: ASR → LLM 理解 → 流式 TTS → 回传播放（走 audio 焦点，自动 ducking 音乐）
+入口层: 语音 + 屏幕（现有 UI 规划）+ 事件总线（voice 意图 → smarthome/player，框架已预留）
+```
+
+| 方案 | 说明 | 工作量 | 定位 |
+|------|------|--------|------|
+| **A. ESP Private Agents**（乐鑫 MaaS） | 托管 ASR+LLM+TTS+Agent，**S31 官方支持**（产品页明确），设备侧跑 esp-agent，免自建后端 | 最低 | MVP 首选 |
+| **B. 自组 API 链路** | ASR（讯飞/阿里/Whisper）+ LLM（DeepSeek/通义/智谱）+ TTS（火山/Edge TTS），自建 WebSocket 流式管线 | 中 | 成本/数据可控 |
+| **C. 混合（推荐正式形态）** | 本地关键词意图优先 + 云端开放对话兜底 | 中 | 体验最佳 |
+
+**关键决策**：
+
+- **API key 安全**：设备端不存明文 key —— 经自建轻量网关代理或托管平台；开启 Flash 加密后设备端直连才可接受
+- **参考实现**：xiaozhi-esp32（开源，唤醒+ASR+LLM+TTS 全链路）作为 M9 起点
+- **待确认**：ESP-SR 对 S31 的支持矩阵（唤醒词/AFE 若暂不支持 → VAD + 按键兜底，或用 Private Agents 平台侧处理）
+- **延迟预算**：本地唤醒(即时) → 云端 ASR(~0.5s) → LLM 首 token(~1s) → TTS 流式(~0.3s) ≈ 2s 内可接受
+- **与现有集成**：对话期间的录音会话与播放器共用 ES8389（双工，见 3.5.3 规则 2）；TTS 播报走 audio 焦点三档仲裁
+
+---
+
 ## 4. 配网方案（详细步骤）
 
 ### 4.1 总体流程
@@ -1123,7 +1153,7 @@ idf.py -p COM3 flash monitor
 | **M6** | 显示（LVGL v9 + SquareLine Studio UI） | ⏳ |
 | **M7** | 音频：**SD 卡播放已落地**（esp_audio_simple_player，见 6.2）；录音 + 蓝牙音频 ⏳ | 🔄 部分完成 |
 | **M8** | **OTA 双通道**（下载后用户确认、SD 强制可降级、meta.json 完整元信息、配置零影响） | ⏳ |
-| **M9** | 语音助手（唤醒词 + LLM 对话 + TTS） | ⏳ |
+| **M9** | 语音助手：本地唤醒/关键词（ESP-SR，待确认 S31 支持）+ 云端 LLM 对话（ESP Private Agents 或自组 API，见 3.9） | ⏳ |
 | **M10** | **智能家居控制**（MQTT + Matter + 意图执行 + 屏幕面板） | ⏳ |
 | **M11** | 3D 外壳设计（基于模块官方 STEP） | ⏳ |
 | **M12** | 整机联调 + 发布 | ⏳ |
@@ -1194,6 +1224,7 @@ idf.py -p COM3 flash monitor
 | [ESP-BLE-AUDIO](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s31/api-guides/esp-ble-audio/ble-audio-index.html) | — | BLE Audio 播放 |
 | [esp-mqtt](https://components.espressif.com/components/espressif/esp-mqtt) | latest | MQTT 客户端（智能家居） |
 | [esp_audio_simple_player](https://components.espressif.com/components/espressif/esp_audio_simple_player) | ^1.0.0~2 | SD 卡音乐播放（ESP-GMF，MP3/WAV/FLAC/AAC…） |
+| [ESP Private Agents](https://developer.espressif.com/blog/2025/12/annoucing_esp_private_agents_platform/) | latest | 语音 Agent 托管平台（ASR+LLM+TTS，S31 官方支持，见 3.9） |
 | [ESP-Matter](https://github.com/espressif/esp-matter) | latest | Matter 设备实现 |
 | [Home Assistant MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/) | — | HA 自动发现/控制 |
 
