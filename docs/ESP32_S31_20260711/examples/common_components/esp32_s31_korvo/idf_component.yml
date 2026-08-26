@@ -1,0 +1,33 @@
+version: "0.1.0"
+description: Board Support Package for ESP32-S31-Korvo
+url: https://github.com/espressif/esp-dev-kits/tree/master/examples/esp32-s31-korvo/examples/common_components/esp32_s31_korvo
+
+targets:
+  - esp32s31
+
+tags:
+  - bsp
+
+dependencies:
+  idf: ">=6.1.0"
+  espressif/esp_lvgl_adapter:
+    version: "^0.5.0"
+    public: true
+  button:
+    version: "^4"
+    public: true
+  espressif/esp_lcd_touch_gt1151:
+    version: "^1"
+    public: true
+  espressif/esp_video:
+    version: "2.2.0"
+    public: true
+  esp_cam_sensor:
+    version: "^2.2.0"
+    public: true
+  esp_codec_dev:
+    version: "^1.5.9"
+    public: true
+  led_strip:
+    version: "^3.0.3"
+    public: true

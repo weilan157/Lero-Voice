@@ -1,0 +1,42 @@
+menu "Lero Voice Diagnostics"
+
+config LERO_DIAG_CONSOLE
+    bool "Enable UART console REPL (CN2, docs/PLAN.md 3.8)"
+    default y
+
+config LERO_DIAG_SD_LOG
+    bool "Mirror logs to SD (/logs, rotating)"
+    default y
+
+config LERO_DIAG_LOG_FILE_SIZE_KB
+    int "SD log file size limit (KB)"
+    default 256
+
+config LERO_DIAG_LOG_FILES
+    int "SD log file count (ring)"
+    default 4
+
+config LERO_DIAG_SNAPSHOT_PERIOD_MS
+    int "Snapshot sampling period (ms)"
+    default 1000
+
+config LERO_DIAG_SNAPSHOT_SLOTS
+    int "Snapshot ring slot count"
+    default 32
+
+config LERO_DIAG_TASK_PRIORITY
+    int "diag_task priority (lowest, docs/PLAN.md 3.5.1)"
+    default 1
+    range 1 18
+
+config LERO_DIAG_TASK_STACK_SIZE
+    int "diag_task stack size (bytes)"
+    default 4096
+
+config LERO_DIAG_TASK_CORE
+    int "diag_task core"
+    default 0
+    range 0 1
+
+endmenu
+

@@ -1,0 +1,34 @@
+idf_component_register(
+    SRCS
+        "bsp.c"
+        "bsp_i2c.c"
+        "bsp_buttons.c"
+        "bsp_power.c"
+        "bsp_usb.c"
+        "bsp_amplifier.c"
+        "bsp_sdcard.c"
+        "bsp_storage.c"
+        "bsp_imu.c"
+        "bsp_codec.c"
+        "bsp_display.c"
+        "bsp_touch.c"
+    INCLUDE_DIRS "."
+    PRIV_REQUIRES
+        esp_driver_gpio
+        esp_driver_i2c
+        esp_driver_ledc
+        esp_driver_sdmmc
+        esp_adc
+        esp_lcd
+        esp_timer
+        esp_partition
+        esp_common
+        esp_system
+        esp_app_format
+        sdmmc
+        fatfs
+        spiffs
+        log
+        freertos
+)
+

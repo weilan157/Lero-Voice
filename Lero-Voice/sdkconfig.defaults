@@ -1,0 +1,33 @@
+# Lero Voice default configuration (docs/PLAN.md)
+# Target / flash
+CONFIG_IDF_TARGET="esp32s31"
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+
+# Partition table (custom CSV, see partitions.csv)
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# OTA rollback support (docs/PLAN.md 8.1)
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# Static allocation (docs/PLAN.md 3.4 rule 2)
+CONFIG_FREERTOS_SUPPORT_STATIC_ALLOCATION=y
+CONFIG_FREERTOS_HZ=1000
+
+# Task diagnostics (diag_console "tasks" command uses uxTaskGetSystemState)
+CONFIG_FREERTOS_USE_TRACE_FACILITY=y
+
+# Logging (docs/PLAN.md 3.8.4)
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+CONFIG_LOG_DEFAULT_LEVEL=3
+
+# Debug: UART console on CN2 + coredump partition (docs/PLAN.md 3.8.1)
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
+CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
+
+# PSRAM: RGB frame buffers are statically allocated in PSRAM (docs/PLAN.md 3.3.1 #4)
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_BOOT_INIT=y
+CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y

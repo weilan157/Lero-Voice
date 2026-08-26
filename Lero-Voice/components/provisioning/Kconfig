@@ -1,0 +1,32 @@
+menu "Lero Voice Provisioning"
+
+config LERO_PROV_WIFI_CONNECT_TIMEOUT_MS
+    int "Saved-config connect timeout (ms)"
+    default 15000
+
+config LERO_PROV_SMARTCONFIG_TIMEOUT_MS
+    int "SmartConfig listen timeout (ms)"
+    default 60000
+
+config LERO_PROV_AP_TIMEOUT_MS
+    int "softAP fallback idle timeout (ms)"
+    default 180000
+
+config LERO_PROV_PROBE_URL
+    string "Network probe URL (must be reachable on the 2.4G network)"
+    default "http://www.msftconnecttest.com/connecttest.txt"
+
+config LERO_PROV_PROBE_TIMEOUT_MS
+    int "Network probe timeout (ms)"
+    default 5000
+
+config LERO_PROV_AP_SSID_PREFIX
+    string "softAP SSID prefix"
+    default "LeroVoice-"
+
+config LERO_PROV_PROBE_MAX_RETRIES
+    int "Network probe retries before softAP fallback"
+    default 3
+
+endmenu
+

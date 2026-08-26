@@ -1,0 +1,23 @@
+idf_component_register(
+    SRCS
+        "diag.c"
+        "diag_log.c"
+        "diag_errors.c"
+        "diag_panic.c"
+        "diag_snapshot.c"
+        "diag_console.c"
+    INCLUDE_DIRS "."
+    REQUIRES bsp provisioning ota_service
+    PRIV_REQUIRES
+        console
+        esp_app_format
+        heap
+        esp_system
+        esp_stdio
+        esp_timer
+        nvs_flash
+        esp_common
+        log
+        freertos
+)
+

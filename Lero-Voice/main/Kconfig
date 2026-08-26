@@ -1,0 +1,57 @@
+menu "Lero Voice Application"
+
+config LERO_NET_TASK_PRIORITY
+    int "net_task priority"
+    default 6
+    range 1 18
+
+config LERO_NET_TASK_STACK_SIZE
+    int "net_task stack size (bytes)"
+    default 6144
+
+config LERO_NET_TASK_CORE
+    int "net_task core (0=PRO_CPU, 1=APP_CPU)"
+    default 0
+    range 0 1
+
+config LERO_NET_POLL_PERIOD_MS
+    int "net_task poll period (ms)"
+    default 5000
+
+config LERO_OTA_TASK_PRIORITY
+    int "ota_task priority"
+    default 5
+    range 1 18
+
+config LERO_OTA_TASK_STACK_SIZE
+    int "ota_task stack size (bytes)"
+    default 6144
+
+config LERO_OTA_TASK_CORE
+    int "ota_task core"
+    default 0
+    range 0 1
+
+config LERO_OTA_CHECK_INTERVAL_MS
+    int "ota_task periodic check interval (ms)"
+    default 3600000
+
+config LERO_SYS_TASK_PRIORITY
+    int "system_task priority"
+    default 2
+    range 1 18
+
+config LERO_SYS_TASK_STACK_SIZE
+    int "system_task stack size (bytes)"
+    default 4096
+
+config LERO_SYS_TASK_CORE
+    int "system_task core"
+    default 0
+    range 0 1
+
+config LERO_APP_EVENT_QUEUE_LEN
+    int "app event queue length"
+    default 16
+
+endmenu

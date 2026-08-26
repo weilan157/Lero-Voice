@@ -140,9 +140,12 @@ idf.py -p COM3 flash monitor
 - [x] 原理图设计
 - [ ] 原理图修订（补 MCLK / SD_DET、核对 IO48/49 标注）
 - [ ] PCB Layout
-- [ ] 工程骨架 + 代码规范（MISRA / 无动态内存 / CI）
-- [ ] BSP 开发（先行）
-- [ ] 配网 / 显示 / 音频 / 智能家居 / OTA 双通道 / 语音助手 / 外壳 / 整机联调
+- [x] 工程骨架 + 代码规范（MISRA / 无动态内存）（main + bsp + components）
+- [x] BSP 框架（bsp/ 十个模块 + 故障位图）
+- [x] 配网框架（SmartConfig + softAP 兑底 + NVS 保存）
+- [x] OTA 双通道框架（HTTP 只升不降 + SD 强制可降级 + 用户确认 + 回滚）
+- [x] 调试诊断框架（diag: console / 日志落盘 / 快照 / 故障位图 / coredump）
+- [ ] 显示 / 音频 / 智能家居 / 语音助手 / 外壳 / 整机联调（BSP 驱动需上板实测校准）
 
 ## 许可证
 
