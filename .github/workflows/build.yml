@@ -6,6 +6,11 @@ on:
     tags: [ 'v*' ]
   pull_request:
 
+# 创建 Release / 上传产物需要写权限（默认 GITHUB_TOKEN 只读，否则
+# softprops/action-gh-release 报 403 "Resource not accessible by integration"）
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build (esp32s31)

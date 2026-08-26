@@ -1045,6 +1045,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # 创建 Release 需要 contents: write（默认 token 只读会 403）
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: espressif/esp-idf-ci-action@v1
