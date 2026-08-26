@@ -29,6 +29,7 @@
 #include "provisioning.h"
 #include "ota_service.h"
 #include "player.h"
+#include "voice.h"
 #include "diag.h"
 
 #define TAG "main"
@@ -43,6 +44,7 @@ typedef enum {
     APP_EVT_BTN2_LONG,          /*< 功能键2 长按：检查 OTA */
     APP_EVT_BTN2_SHORT,         /*< 功能键2 短按：待确认时=确认升级，否则=检查 OTA */
     APP_EVT_BTN3_SHORT,         /*< 功能键3 短按：状态灯切换 */
+    APP_EVT_BTN3_LONG,          /*< 功能键3 长按：开始/停止语音聆听 */
     APP_EVT_OTA_CHECK,          /*< 触发 OTA 检查（HTTP 通道） */
     APP_EVT_OTA_CONFIRM,        /*< 用户确认升级（UI/语音/按键入口） */
     APP_EVT_OTA_ABORT,          /*< 用户取消升级（UI/语音/按键入口） */
@@ -129,6 +131,8 @@ static void s_buttons_cb(bsp_button_id_t button, bsp_button_event_t event)
     } else if (button == BSP_BTN_ID_3) {
         if (event == BSP_BTN_EVENT_SHORT_PRESS) {
             app_event_post(APP_EVT_BTN3_SHORT);
+        } else if (event == BSP_BTN_EVENT_LONG_PRESS) {
+            app_event_post(APP_EVT_BTN3_LONG);
         }
     }
 }
@@ -212,6 +216,17 @@ static void s_sys_task(void *arg)
             s_led_on = !s_led_on;
             (void)bsp_power_set_led(s_led_on);
             break;
+        case APP_EVT_BTN3_LONG: {
+            /* 语音聆听开关（骨架阶段：按键触发；M9 接入唤醒词） */
+            voice_state_t vst = VOICE_STATE_IDLE;
+            (void)voice_get_state(&vst);
+            if (vst == VOICE_STATE_LISTENING) {
+                (void)voice_listen_stop();
+            } else {
+                (void)voice_listen_start();
+            }
+            break;
+        }
         default:
             break;
         }
@@ -248,6 +263,11 @@ void app_main(void)
     /* SD 卡音乐播放器（ESP-GMF + ES8389；console: play/stop/vol，见 diag） */
     if (player_init() != ESP_OK) {
         ESP_LOGW(TAG, "player init failed (codec/SD 未就绪时降级运行)");
+    }
+
+    /* 语音助手骨架（采集/VAD/上传接口；console: voice-*，见 diag） */
+    if (voice_init() != ESP_OK) {
+        ESP_LOGW(TAG, "voice init failed (降级：无语音采集)");
     }
 
     /* 开机自动连接已保存的 WiFi 配置；无配置则自动进入配网模式（PLAN 4.3） */

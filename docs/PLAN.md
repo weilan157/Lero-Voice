@@ -240,7 +240,7 @@ Lero-Voice/                    # 仓库根 = ESP-IDF 工程（target: esp32s31�
 │   ├── diag/                  # 调试诊断：console / 日志落盘 / 诊断页 / coredump（见 3.8）
 │   ├── player/                # SD 卡音乐播放：ESP-GMF + ES8389（见 6.2）
 │   ├── smarthome/             # 智能家居：MQTT + Matter + 意图解析（规划，见第 7 章）
-│   └── voice/                 # 唤醒词 / 录音 / 回声消除（规划，ESP-SR 待确认）
+│   └── voice/                 # 语音助手骨架：采集/VAD/上传接口/唤醒占位（见 3.9）
 ├── partitions.csv             # OTA 分区表（见 8.1）
 ├── CMakeLists.txt             # PROJECT_VER=0.1.0（OTA 版本比较基准）
 ├── sdkconfig.defaults         # 静态分配 / 分区 / 日志等默认配置
@@ -348,7 +348,7 @@ components/bsp/
 | 任务 | 职责 | 优先级 | 核 | 栈(初始预算) | 触发方式 |
 |------|------|:------:|:--:|:------------:|----------|
 | `audio_task` | ESP-GMF 播放管道（解码→I2S→DAC）、音频焦点仲裁（music/TTS/prompt）、AEC 参考注入 | **16** | **Core 1** | 8 KB | 事件队列（播放/停止/音量） |
-| `voice_task` | 录音采集（I2S→ADC）、唤醒词 / VAD / AEC、意图文本输出 | **15** | **Core 1**（SIMD 核，若可） | 12 KB | 采集帧驱动 + 事件 |
+| `voice_task` | 录音采集（I2S→ADC）、VAD、上传传输（骨架已建，见 3.9）；唤醒/AEC 待 ESP-SR | **15** | **Core 1** | 12 KB | 采集帧驱动 + 事件 |
 | `ui_task` | LVGL 刷新（lv_timer_handler）、首帧背光点亮、界面状态更新 | **10** | **Core 1** | 8 KB | 事件总线 + lvgl_port |
 | `smarthome_task` | MQTT 收发/重连、Matter 事件、意图执行、HA Discovery | **8** | **Core 0** | 8 KB | MQTT 回调入队 + 定时 |
 | `net_task` | WiFi 连接管理、SmartConfig、softAP、SNTP、断线重连 | **6** | **Core 0** | 6 KB | 事件 + 状态机 |
@@ -654,6 +654,7 @@ components/diag/
 
 **关键决策**：
 
+- **骨架已实现**（`components/voice/`）：voice_task（prio 15/Core 1/静态栈）+ 采集（48k/2ch/16bit，与播放器共享双工 codec）+ 简化 VAD（RMS+尾长）+ 可插拔上传接口（默认空实现，M9 替换为 Private Agents/自组 WS）+ 唤醒占位（按键/console `voice-listen` 触发）
 - **API key 安全**：设备端不存明文 key —— 经自建轻量网关代理或托管平台；开启 Flash 加密后设备端直连才可接受
 - **参考实现**：xiaozhi-esp32（开源，唤醒+ASR+LLM+TTS 全链路）作为 M9 起点
 - **待确认**：ESP-SR 对 S31 的支持矩阵（唤醒词/AFE 若暂不支持 → VAD + 按键兜底，或用 Private Agents 平台侧处理）
@@ -1153,7 +1154,7 @@ idf.py -p COM3 flash monitor
 | **M6** | 显示（LVGL v9 + SquareLine Studio UI） | ⏳ |
 | **M7** | 音频：**SD 卡播放已落地**（esp_audio_simple_player，见 6.2）；录音 + 蓝牙音频 ⏳ | 🔄 部分完成 |
 | **M8** | **OTA 双通道**（下载后用户确认、SD 强制可降级、meta.json 完整元信息、配置零影响） | ⏳ |
-| **M9** | 语音助手：本地唤醒/关键词（ESP-SR，待确认 S31 支持）+ 云端 LLM 对话（ESP Private Agents 或自组 API，见 3.9） | ⏳ |
+| **M9** | 语音助手：骨架已搭（采集/VAD/上传接口，见 3.9）；唤醒/ASR/LLM/TTS 待接（ESP Private Agents 或自组 API） | 🔄 骨架已建 |
 | **M10** | **智能家居控制**（MQTT + Matter + 意图执行 + 屏幕面板） | ⏳ |
 | **M11** | 3D 外壳设计（基于模块官方 STEP） | ⏳ |
 | **M12** | 整机联调 + 发布 | ⏳ |

@@ -34,6 +34,7 @@
 #include "provisioning.h"
 #include "ota_service.h"
 #include "player.h"
+#include "voice.h"
 #include "diag.h"
 #include "diag_internal.h"
 
@@ -355,6 +356,45 @@ static int cmd_ota_cancel(int argc, char **argv)
     return 0;
 }
 
+static const char *s_voice_state_name(voice_state_t st)
+{
+    switch (st) {
+    case VOICE_STATE_IDLE:       return "idle";
+    case VOICE_STATE_LISTENING:  return "listening";
+    case VOICE_STATE_PROCESSING: return "processing";
+    case VOICE_STATE_SPEAKING:   return "speaking";
+    default:                     return "?";
+    }
+}
+
+static int cmd_voice(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    voice_state_t st = VOICE_STATE_IDLE;
+    (void)voice_get_state(&st);
+    printf("voice state: %s\n", s_voice_state_name(st));
+    return 0;
+}
+
+static int cmd_voice_listen(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    esp_err_t err = voice_listen_start();
+    printf("voice listen: %s\n", (err == ESP_OK) ? "started" : esp_err_to_name(err));
+    return 0;
+}
+
+static int cmd_voice_stop(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    (void)voice_listen_stop();
+    printf("voice stop\n");
+    return 0;
+}
+
 esp_err_t diag_console_register(void)
 {
     static const esp_console_cmd_t s_cmds[] = {
@@ -379,6 +419,9 @@ esp_err_t diag_console_register(void)
         { .command = "resume",   .help = "resume playback",             .hint = NULL, .func = cmd_resume },
         { .command = "vol",      .help = "vol <0-100>",                 .hint = NULL, .func = cmd_vol },
         { .command = "player",   .help = "player state",                .hint = NULL, .func = cmd_player },
+        { .command = "voice",    .help = "voice state",                 .hint = NULL, .func = cmd_voice },
+        { .command = "voice-listen", .help = "start voice listen",      .hint = NULL, .func = cmd_voice_listen },
+        { .command = "voice-stop",   .help = "stop voice listen",       .hint = NULL, .func = cmd_voice_stop },
     };
     for (size_t i = 0U; i < (sizeof(s_cmds) / sizeof(s_cmds[0])); i++) {
         const esp_err_t err = esp_console_cmd_register(&s_cmds[i]);

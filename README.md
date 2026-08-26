@@ -138,7 +138,8 @@ Lero-Voice/            # 仓库根 = ESP-IDF 工程（target: esp32s31）
 │   ├── provisioning/  # SmartConfig (ESP-TOUCH v2) + softAP 兜底
 │   ├── ota_service/   # 双通道 OTA（HTTP + SD）+ 用户确认 + 回滚自证
 │   ├── diag/          # console / 日志落盘 / 快照 / 错误 / coredump
-│   └── player/        # SD 卡音乐播放（ESP-GMF + ES8389）
+│   ├── player/        # SD 卡音乐播放（ESP-GMF + ES8389）
+│   └── voice/         # 语音助手骨架（采集/VAD/上传接口，M9）
 ├── partitions.csv     # factory + ota_0 + ota_1 + storage + coredump (16 MB)
 └── sdkconfig.defaults
 ```
@@ -184,8 +185,9 @@ player                    # 查询播放状态
 - [x] OTA 双通道框架（HTTP 只升不降 + SD 强制可降级 + 用户确认 + 回滚）
 - [x] 调试诊断框架（diag: console / 日志落盘 / 快照 / 故障位图 / coredump）
 - [x] SD 卡音乐播放（esp_audio_simple_player + ES8389，console 控制）
+- [x] 语音助手骨架（voice 组件：采集 / VAD / 上传接口 / 唤醒占位）
 - [x] CI（.github/workflows/build.yml：构建 / 体积检查 / meta.json / Release / 静态分析）
-- [ ] 显示 / 音频录音 / 智能家居 / 语音助手 / 外壳 / 整机联调（BSP 驱动需上板实测校准）
+- [ ] 显示 / 音频录音 / 智能家居 / 语音助手（唤醒+云端）/ 外壳 / 整机联调（BSP 驱动需上板实测校准）
 
 ## 许可证
 

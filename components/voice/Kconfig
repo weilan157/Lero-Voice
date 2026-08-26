@@ -1,0 +1,46 @@
+menu "Lero Voice Voice Assistant"
+
+config LERO_VOICE_TASK_PRIORITY
+    int "voice_task priority"
+    default 15
+    range 1 18
+
+config LERO_VOICE_TASK_STACK
+    int "voice_task stack (bytes)"
+    default 12288
+
+config LERO_VOICE_TASK_CORE
+    int "voice_task core (0=PRO_CPU, 1=APP_CPU)"
+    default 1
+    range 0 1
+
+config LERO_VOICE_SAMPLE_RATE
+    int "Capture sample rate (Hz; must match player/codec clock domain)"
+    default 48000
+
+config LERO_VOICE_CHANNELS
+    int "Capture channels (2 = dual mic)"
+    default 2
+    range 1 2
+
+config LERO_VOICE_FRAME_MS
+    int "Capture frame length (ms)"
+    default 20
+
+config LERO_VOICE_LISTEN_TIMEOUT_MS
+    int "Max listen duration (ms)"
+    default 10000
+
+config LERO_VOICE_VAD_RMS_THRESHOLD
+    int "VAD RMS threshold (16-bit PCM; higher = less sensitive)"
+    default 400
+
+config LERO_VOICE_VAD_TAIL_MS
+    int "VAD tail after last speech (ms)"
+    default 800
+
+config LERO_VOICE_MIN_UTTERANCE_MS
+    int "Minimum utterance length before auto stop (ms)"
+    default 400
+
+endmenu
