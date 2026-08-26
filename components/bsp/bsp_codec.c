@@ -18,10 +18,10 @@
  * does not route MCLK to the codec (docs/PLAN.md 2.6 #1); the audio path
  * works once the schematic revision + new PCB are in place.
  *
- * NOTE: es8389_codec_cfg_t field set follows the es83xx family shape
- * ({ctrl_if, use_mclk, master_mode, mclk_div, codec_mode}); verify against
- * the shipped es8389_codec.h on first build (one-line fix if a field name
- * differs).
+ * NOTE: 针对 esp_codec_dev 2.x（本工程经 gmf 链解析到 2.0.0-beta3）：
+ * es8389_codec_cfg_t 由 v1 的平铺字段改为 audio_hw_*_cfg_t 子配置
+ * （sys/adc/dac/pa），工作模式枚举已移除。子配置置 0 由驱动兜底默认，
+ * 上板前按 audio_codec_hw_cfg.h 细化（use_mclk/mclk_div 等）。
  */
 
 #include <string.h>
@@ -150,13 +150,15 @@ esp_err_t bsp_codec_init(void)
         return ESP_FAIL;
     }
 
-    /* 5. ES8389 codec 接口（字段集按 es83xx 家族，首次编译核对） */
+    /* 5. ES8389 codec 接口（esp_codec_dev 2.x 子配置结构；
+     *    子配置置 0 由驱动兜底，上板前按 audio_codec_hw_cfg.h 细化） */
     es8389_codec_cfg_t codec_cfg = {
         .ctrl_if = ctrl_if,
-        .use_mclk = true,
-        .master_mode = false,               /* I2S 为主，codec 从模式 */
-        .mclk_div = CODEC_MCLK_MULTIPLE,
-        .codec_mode = ESP_CODEC_DEV_WORK_MODE_BOTH,
+        .gpio_if = audio_codec_new_gpio(),
+        .sys_cfg = { 0 },
+        .adc_cfg = { 0 },
+        .dac_cfg = { 0 },
+        .pa_cfg = { 0 },
     };
     const audio_codec_if_t *codec_if = es8389_codec_new(&codec_cfg);
     if (codec_if == NULL) {

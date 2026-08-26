@@ -46,7 +46,7 @@ jobs:
             python -m pip install -U --quiet idf-component-manager
             idf.py update-dependencies
             ls managed_components
-            for f in $(find managed_components -name "es8389_codec.h" -o -name "esp_codec_dev_defaults.h" -o -name "esp_codec_dev_types.h" -o -name "esp_codec_dev.h"); do
+            for f in $(find managed_components -name "audio_codec_hw_cfg.h"); do
               echo "===== $f ====="; head -c 20000 "$f"
             done
             idf.py build
