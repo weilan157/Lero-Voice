@@ -24,7 +24,7 @@ jobs:
 
       - name: App size check (4 MB OTA slot limit)
         run: |
-          SIZE=$(stat -c%s build/lero_app.bin)
+          SIZE=$(stat -c%s build/Lero-Voice.bin)
           test "$SIZE" -le 3984588 || { echo "app too large for OTA slot (limit 3.8 MB)"; exit 1; }
           echo "app size: $SIZE bytes (limit 3984588)"
 
@@ -32,16 +32,16 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           cd build
-          sha256sum lero_app.bin | awk '{print $1}' > app.sha256
+          sha256sum Lero-Voice.bin | awk '{print $1}' > app.sha256
           PT_SHA=$(sha256sum ../partitions.csv | awk '{print $1}')
-          SIZE=$(stat -c%s lero_app.bin)
+          SIZE=$(stat -c%s Lero-Voice.bin)
           jq -n --arg v "$GITHUB_REF_NAME" \
                  --arg s "$(cat app.sha256)" \
                  --arg p "$PT_SHA" \
                  --argjson n "$SIZE" \
             '{version:$v, min_app_version:"v1.0.0", target:"esp32s31-wroom-3",
               soc:"esp32s31", flash_size:16777216, psram:true,
-              app_bin:"lero_app.bin", app_bin_size:$n, app_sha256:$s,
+              app_bin:"Lero-Voice.bin", app_bin_size:$n, app_sha256:$s,
               partition_table_sha256:$p, idf_version:"v6.0.2",
               build_date:(now|todateiso8601), release_notes:"", signature:""}' > meta.json
 
@@ -50,7 +50,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            build/lero_app.bin
+            build/Lero-Voice.bin
             build/app.sha256
             build/meta.json
 

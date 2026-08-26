@@ -94,7 +94,7 @@ static int s_event(esp_asp_event_pkt_t *event, void *ctx)
             }
         }
     } else if (event->type == ESP_ASP_EVENT_TYPE_STATE) {
-        esp_asp_state_t st = ESP_ASP_STATE_IDLE;
+        esp_asp_state_t st = (esp_asp_state_t)0;   /* 枚举首值：无数据时安全 */
         if (event->payload_size >= (int)sizeof(st)) {
             (void)memcpy(&st, event->payload, sizeof(st));
         }

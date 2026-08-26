@@ -9,8 +9,8 @@
  * @brief SD channel: /update/ scanning + force upgrade (downgrade allowed).
  *
  * Directory layout (docs/PLAN.md 8.5):
- *   /update/lero_app.bin
- *   /update/lero_app.bin.sha256   (hex string, one line)
+ *   /update/Lero-Voice.bin
+ *   /update/Lero-Voice.bin.sha256   (hex string, one line)
  *   /update/update.json           (optional meta)
  */
 
@@ -70,7 +70,8 @@ esp_err_t ota_sd_find_update(ota_meta_t *meta)
         return err;
     }
     (void)memset(meta, 0, sizeof(*meta));
-    (void)strlcpy(meta->app_bin, "lero_app.bin", sizeof(meta->app_bin));
+    /* 默认固件文件名与 IDF 产物一致（project Lero-Voice -> Lero-Voice.bin） */
+    (void)strlcpy(meta->app_bin, "Lero-Voice.bin", sizeof(meta->app_bin));
 
     /* 可选 update.json */
     char path[SD_PATH_MAX];

@@ -943,9 +943,9 @@ components/ota_service/
 
 ```
 SD 卡目录约定：
-  /update/lero_app.bin          # 固件（OTA 槽位 bin）
-  /update/lero_app.bin.sha256   # SHA-256（hex 字符串，一行）
-  /update/update.json           # 可选元信息（版本/说明；无则从文件名推断）
+  /update/Lero-Voice.bin          # 固件（OTA 槽位 bin；文件名与 IDF 产物一致）
+  /update/Lero-Voice.bin.sha256   # SHA-256（hex 字符串，一行）
+  /update/update.json             # 可选元信息（版本/说明；无则从文件名推断）
 
 1. 用户放入文件 → 插入 SD 卡（或设置界面点击"本地升级"）
 2. 挂载 SD → 扫描 /update/ → 读取元信息（无 update.json 时从文件名解析版本）
@@ -984,7 +984,7 @@ SD 卡目录约定：
   "soc": "esp32s31",
   "flash_size": 16777216,
   "psram": true,
-  "app_bin": "lero_app.bin",
+  "app_bin": "Lero-Voice.bin",
   "app_bin_size": 1234567,
   "app_sha256": "8f4a...（64 位 hex）",
   "partition_table_sha256": "a3c9...（64 位 hex）",
@@ -1055,28 +1055,28 @@ jobs:
         run: idf.py build
       - name: Check app size (4 MB OTA slot limit)
         run: |
-          SIZE=$(stat -c%s build/lero_app.bin)
+          SIZE=$(stat -c%s build/Lero-Voice.bin)
           test "$SIZE" -le 3984588 || { echo "app too large for OTA slot (limit 3.8 MB)"; exit 1; }
       - name: Generate OTA metadata (meta.json)
         run: |
           cd build
-          sha256sum lero_app.bin | awk '{print $1}' > app.sha256
+          sha256sum Lero-Voice.bin | awk '{print $1}' > app.sha256
           PT_SHA=$(sha256sum ../partitions.csv | awk '{print $1}')
-          SIZE=$(stat -c%s lero_app.bin)
+          SIZE=$(stat -c%s Lero-Voice.bin)
           jq -n --arg v "$GITHUB_REF_NAME" \
                  --arg s "$(cat app.sha256)" \
                  --arg p "$PT_SHA" \
                  --argjson n "$SIZE" \
             '{version:$v, min_app_version:"v1.0.0", target:"esp32s31-wroom-3",
               soc:"esp32s31", flash_size:16777216, psram:true,
-              app_bin:"lero_app.bin", app_bin_size:$n, app_sha256:$s,
+              app_bin:"Lero-Voice.bin", app_bin_size:$n, app_sha256:$s,
               partition_table_sha256:$p, idf_version:"v6.0.2",
               build_date:(now|todateiso8601), release_notes:"", signature:""}' > meta.json
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            build/lero_app.bin
+            build/Lero-Voice.bin
             build/app.sha256
             build/meta.json
 ```
@@ -1090,7 +1090,7 @@ jobs:
 | 3 | **下载中断无断点续传** | v1 直接重下（简单可靠）；断点续传（HTTP Range + NVS 偏移记录）列为后续增强 |
 | 4 | **弱网长下载**（4 MB 可达 10+ 分钟） | 进度上屏、可取消（取消清半包）；`ota_task` 低优先级，下载不影响音乐播放；失败自动重试 |
 | 5 | **pending 未应用时发布新版本** | 直接覆盖重下（旧 pending 丢弃），仅保留最新 |
-| 6 | **应用体积超槽** | CI 增加大小检查：`lero_app.bin ≤ 3.8 MB`（4 MB 槽留余量），超限构建失败 |
+| 6 | **应用体积超槽** | CI 增加大小检查：`Lero-Voice.bin ≤ 3.8 MB`（4 MB 槽留余量），超限构建失败 |
 | 7 | **分区表 hash 来源** | 构建脚本对 `partitions.csv` 生成 `partition_table_sha256.h` 内嵌固件，与 meta.json 字段比较（CI 已填充该字段） |
 | 8 | **版本自证** | 升级后健康自检校验 `esp_app_get_description()->version == meta.version`，不符计入回滚（防"假升级"） |
 | 9 | **NVS 状态键磨损** | 状态键仅在变化时写 NVS；`esp_nvs_get_stats` 监控用量（见 8.6 #8） |
