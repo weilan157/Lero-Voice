@@ -1051,8 +1051,11 @@ jobs:
           esp_idf_version: release-v6.1  # v6.1 分支镜像（首个含 esp32s31 工具链；v6.0 全系不含）
           target: esp32s31
           path: '.'
-      - name: Build firmware
-        run: idf.py build
+          # 容器内执行：确保组件管理器可用 + 拉取依赖 + 构建
+          command: |
+            python -c "import idf_component_manager" 2>/dev/null || python -m pip install --quiet idf-component-manager
+            idf.py reconfigure
+            idf.py build
       - name: Check app size (4 MB OTA slot limit)
         run: |
           SIZE=$(stat -c%s build/Lero-Voice.bin)

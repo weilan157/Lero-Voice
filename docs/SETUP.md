@@ -131,7 +131,7 @@ idf.py -p /dev/ttyUSB0 flash monitor   # Linux/macOS 端口示例
 | **编译容器** | `espressif/esp-idf-ci-action@v1` 是官方 **`espressif/idf` Docker 镜像**的封装（`esp_idf_version` 参数 = Docker Hub tag）。**使用 `release-v6.1`**（v6.1 分支，首个含 **esp32s31** 工具链的版本线）——**v6.0 / release-v6.0 全系不含 S31 工具链** |
 | **首次拉取** | 镜像约 4.3 GB，首次较慢；GitHub 自动缓存容器层，同 tag 后续秒级 |
 | **增量编译** | 挂载 `.ccache` 卷 + `IDF_CCACHE_ENABLE=1`，由 `actions/cache` 跨运行持久化（首次全量，之后增量） |
-| **组件拉取** | 容器内 `idf.py build` 自动从组件仓库下载 `idf_component.yml` 依赖 |
+| **组件拉取** | CI 显式执行 `idf.py reconfigure` 触发组件管理器（容器若缺 `idf-component-manager` pip 包会自动安装）；输出应含 `Processing N dependencies` |
 | **版本锁定** | `esp_idf_version` 必须匹配 Docker Hub 的 `espressif/idf` tag；换 IDF 版本只改这一处 |
 
 **本地复现 CI 编译**（与 CI 完全一致的环境）：
