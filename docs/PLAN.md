@@ -1051,10 +1051,10 @@ jobs:
           esp_idf_version: release-v6.1  # v6.1 分支镜像（首个含 esp32s31 工具链；v6.0 全系不含）
           target: esp32s31
           path: '.'
-          # 容器内执行：确保组件管理器可用 + 拉取依赖 + 构建
+          # 容器内执行：升级组件管理器 + 显式拉取依赖（v6.1 起不再随 cmake 自动执行）+ 构建
           command: |
-            python -c "import idf_component_manager" 2>/dev/null || python -m pip install --quiet idf-component-manager
-            idf.py reconfigure
+            python -m pip install -U --quiet idf-component-manager
+            idf.py update-dependencies
             idf.py build
       - name: Check app size (4 MB OTA slot limit)
         run: |

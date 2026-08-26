@@ -38,12 +38,13 @@ jobs:
           esp_idf_version: release-v6.1
           target: esp32s31
           path: '.'
-          # 组件管理器：v6.x 容器可能缺 idf-component-manager pip 包，
-          # 显式确保可用并 reconfigure 触发依赖拉取（managed_components/）；
-          # reconfigure 输出应包含 "Processing N dependencies"
+          # 组件依赖：IDF v6.1 起组件管理器不再随 cmake 自动执行
+          # （v6.0 及以前的 component_manager.cmake 已移除），必须显式
+          # 调用 idf.py update-dependencies 拉取 managed_components/；
+          # 顺带确保/升级 idf-component-manager pip 包匹配接口版本。
           command: |
-            python -c "import idf_component_manager" 2>/dev/null || python -m pip install --quiet idf-component-manager
-            idf.py reconfigure
+            python -m pip install -U --quiet idf-component-manager
+            idf.py update-dependencies
             idf.py build
           # 注意：extra_docker_args 必须为单行（action 将其嵌入多行 docker
           # 命令；用 YAML 折叠标量 >- 合并换行为空格，禁止用 | 保留换行）
