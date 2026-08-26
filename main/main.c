@@ -28,6 +28,7 @@
 #include "bsp_power.h"
 #include "provisioning.h"
 #include "ota_service.h"
+#include "player.h"
 #include "diag.h"
 
 #define TAG "main"
@@ -232,6 +233,11 @@ void app_main(void)
     (void)prov_init(s_prov_event_cb);
     (void)ota_service_init(s_ota_event_cb);
     (void)bsp_buttons_set_handler(s_buttons_cb);
+
+    /* SD 卡音乐播放器（ESP-GMF + ES8389；console: play/stop/vol，见 diag） */
+    if (player_init() != ESP_OK) {
+        ESP_LOGW(TAG, "player init failed (codec/SD 未就绪时降级运行)");
+    }
 
     /* 开机自动连接已保存的 WiFi 配置；无配置则自动进入配网模式（PLAN 4.3） */
     esp_err_t prov_err = prov_start();

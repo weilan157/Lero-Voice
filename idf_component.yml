@@ -1,0 +1,6 @@
+## Lero Voice managed component dependencies
+## (docs/PLAN.md 3.1 / 6.2: ESP-GMF audio via esp_audio_simple_player)
+dependencies:
+  espressif/esp_codec_dev: "^1.6.2"            # ES8389 官方驱动（播放+录音）
+  espressif/esp_audio_simple_player: "^1.0.0~2" # ESP-GMF 播放器（MP3/WAV/FLAC/AAC...）
+  idf: ">=6.0"

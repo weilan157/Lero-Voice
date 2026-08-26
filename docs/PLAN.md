@@ -238,6 +238,7 @@ Lero-Voice/                    # 仓库根 = ESP-IDF 工程（target: esp32s31�
 │   ├── ota_service/           # 双通道 OTA（HTTP + SD）+ 用户确认（见第 8 章）
 │   ├── provisioning/          # SmartConfig + softAP 配网（见第 4 章）
 │   ├── diag/                  # 调试诊断：console / 日志落盘 / 诊断页 / coredump（见 3.8）
+│   ├── player/                # SD 卡音乐播放：ESP-GMF + ES8389（见 6.2）
 │   ├── smarthome/             # 智能家居：MQTT + Matter + 意图解析（规划，见第 7 章）
 │   └── voice/                 # 唤醒词 / 录音 / 回声消除（规划，ESP-SR 待确认）
 ├── partitions.csv             # OTA 分区表（见 8.1）
@@ -733,6 +734,15 @@ I2C:  SDA(IO0)/SCL(IO1) → ES8389 控制 (0x20)，与 QMI8658A(0x6A) 共用总�
 5. **回声消除（AEC）**：语音助手场景必须做 AEC —— 用 ESP-SR（若支持 S31）或参考 Korvo-1 的双麦方案；至少把播放参考信号接入处理链路
 6. 喇叭功率预算：3 W×2 连续播放时，评估电池（放电倍率）与散热
 
+### 6.2 SD 卡音乐播放（已实现，`components/player/`）
+
+- **管线**：SD 文件（`file://sdcard/...` URI）→ **esp_audio_simple_player**（ESP-GMF 解码 + 采样率/声道/位深转换）→ PCM 输出回调 → **esp_codec_dev**（ES8389，I2S 主模式，引脚见 2.4.1）
+- **格式**：mp3 / wav / flac / aac / amr / m4a / opus（按文件扩展名自动选择解码器，menuconfig 可裁剪以省 Flash）
+- **API**：`player_play_file(path)` / `player_stop` / `player_pause` / `player_resume` / `player_set_volume` / `player_get_state` + 状态事件回调
+- **codec 生命周期**：收到 `MUSIC_INFO` 事件（采样率/声道/位深）→ `esp_codec_dev_open` → 功放使能；`STOPPED/FINISHED/ERROR` → 关 codec → 功放关闭（防爆音，3.3.1 #3）
+- **控制入口**：diag console 命令 `play / stop / pause / resume / vol / player`；后续接 UI 与语音意图
+- ⚠️ 出声前提：MCLK 接线（原理图修订 2.6 #1）+ ES8389 驱动上板实测（`es8389_codec_cfg_t` 字段以实际头文件为准）
+
 ---
 
 ## 7. 智能家居控制方案
@@ -1098,7 +1108,7 @@ idf.py -p COM3 flash monitor
 | **M4** | **BSP 开发（先行）**：bsp_init 打通 → 显示+触摸 → 音频 → SD → IMU/电源 | ⏳ |
 | **M5** | 配网（SmartConfig + softAP 兜底 + 小程序） | ⏳ |
 | **M6** | 显示（LVGL v9 + SquareLine Studio UI） | ⏳ |
-| **M7** | 音频（ES8389 播放/录音 + 蓝牙音频） | ⏳ |
+| **M7** | 音频：**SD 卡播放已落地**（esp_audio_simple_player，见 6.2）；录音 + 蓝牙音频 ⏳ | 🔄 部分完成 |
 | **M8** | **OTA 双通道**（下载后用户确认、SD 强制可降级、meta.json 完整元信息、配置零影响） | ⏳ |
 | **M9** | 语音助手（唤醒词 + LLM 对话 + TTS） | ⏳ |
 | **M10** | **智能家居控制**（MQTT + Matter + 意图执行 + 屏幕面板） | ⏳ |
@@ -1170,6 +1180,7 @@ idf.py -p COM3 flash monitor
 | [esp_ghota](https://github.com/ghota/esp_ghota) | latest | HTTP OTA（GitHub Releases） |
 | [ESP-BLE-AUDIO](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s31/api-guides/esp-ble-audio/ble-audio-index.html) | — | BLE Audio 播放 |
 | [esp-mqtt](https://components.espressif.com/components/espressif/esp-mqtt) | latest | MQTT 客户端（智能家居） |
+| [esp_audio_simple_player](https://components.espressif.com/components/espressif/esp_audio_simple_player) | ^1.0.0~2 | SD 卡音乐播放（ESP-GMF，MP3/WAV/FLAC/AAC…） |
 | [ESP-Matter](https://github.com/espressif/esp-matter) | latest | Matter 设备实现 |
 | [Home Assistant MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/) | — | HA 自动发现/控制 |
 

@@ -101,3 +101,15 @@ esp_err_t bsp_i2c_add_device1(uint16_t addr, uint32_t speed_hz, i2c_master_dev_h
     return s_add_device(s_bus1, addr, speed_hz, dev);
 }
 
+esp_err_t bsp_i2c_get_bus0(i2c_master_bus_handle_t *bus)
+{
+    if (bus == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!s_bus0_created) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    *bus = s_bus0;
+    return ESP_OK;
+}
+

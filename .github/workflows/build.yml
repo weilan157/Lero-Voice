@@ -1,0 +1,76 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+
+jobs:
+  build:
+    name: Build (esp32s31)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.0        # 支持 esp32s31 的 IDF 版本（docs/PLAN.md 8.10）
+          target: esp32s31
+          path: '.'
+
+      - name: Build firmware
+        run: idf.py build
+
+      - name: App size check (4 MB OTA slot limit)
+        run: |
+          SIZE=$(stat -c%s build/lero_app.bin)
+          test "$SIZE" -le 3984588 || { echo "app too large for OTA slot (limit 3.8 MB)"; exit 1; }
+          echo "app size: $SIZE bytes (limit 3984588)"
+
+      - name: Generate OTA metadata (meta.json)
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          cd build
+          sha256sum lero_app.bin | awk '{print $1}' > app.sha256
+          PT_SHA=$(sha256sum ../partitions.csv | awk '{print $1}')
+          SIZE=$(stat -c%s lero_app.bin)
+          jq -n --arg v "$GITHUB_REF_NAME" \
+                 --arg s "$(cat app.sha256)" \
+                 --arg p "$PT_SHA" \
+                 --argjson n "$SIZE" \
+            '{version:$v, min_app_version:"v1.0.0", target:"esp32s31-wroom-3",
+              soc:"esp32s31", flash_size:16777216, psram:true,
+              app_bin:"lero_app.bin", app_bin_size:$n, app_sha256:$s,
+              partition_table_sha256:$p, idf_version:"v6.0.2",
+              build_date:(now|todateiso8601), release_notes:"", signature:""}' > meta.json
+
+      - name: Create Release (tag only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/lero_app.bin
+            build/app.sha256
+            build/meta.json
+
+  static-analysis:
+    name: Static analysis (cppcheck + MISRA, informational)
+    runs-on: ubuntu-latest
+    continue-on-error: true   # 参考性检查：MISRA 基线随实现推进逐步收紧
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: sudo apt-get update && sudo apt-get install -y cppcheck
+
+      - name: cppcheck MISRA addon on own code
+        run: |
+          cppcheck --addon=misra --enable=warning,style --std=c11 \
+            --suppress=missingIncludeSystem --suppress=missingInclude \
+            --inline-suppr \
+            -Icomponents/bsp -Icomponents/ota_service -Icomponents/provisioning \
+            -Icomponents/diag -Icomponents/player -Imain \
+            components main 2>&1 | tee cppcheck.log
+          echo "--- summary ---"
+          grep -c "error:" cppcheck.log || true

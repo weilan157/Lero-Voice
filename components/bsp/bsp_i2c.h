@@ -52,6 +52,13 @@ esp_err_t bsp_i2c_add_device0(uint16_t addr, uint32_t speed_hz, i2c_master_dev_h
  */
 esp_err_t bsp_i2c_add_device1(uint16_t addr, uint32_t speed_hz, i2c_master_dev_handle_t *dev);
 
+/**
+ * @brief Get the I2C0 master bus handle (for esp_codec_dev control interface).
+ * @param[out] bus        Returned bus handle.
+ * @return ESP_OK / ESP_ERR_INVALID_STATE when the bus is not created.
+ */
+esp_err_t bsp_i2c_get_bus0(i2c_master_bus_handle_t *bus);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,0 +1,17 @@
+menu "Lero Voice Audio Player"
+
+config LERO_PLAYER_TASK_PRIORITY
+    int "Player internal task priority (ESP-GMF asp task)"
+    default 5
+    range 1 18
+
+config LERO_PLAYER_TASK_STACK
+    int "Player internal task stack (bytes)"
+    default 6144
+
+config LERO_PLAYER_DEFAULT_VOLUME
+    int "Default playback volume (0-100)"
+    default 60
+    range 0 100
+
+endmenu

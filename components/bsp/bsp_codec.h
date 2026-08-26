@@ -20,6 +20,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "esp_err.h"
+#include "esp_codec_dev.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,6 +37,12 @@ esp_err_t bsp_codec_init(void);
  * @return true when present.
  */
 bool bsp_codec_is_present(void);
+
+/**
+ * @brief Get the esp_codec_dev playback/record handle (NULL until init OK).
+ * @return Codec device handle or NULL.
+ */
+esp_codec_dev_handle_t bsp_codec_get_handle(void);
 
 /**
  * @brief Set playback volume.

@@ -7,7 +7,7 @@ idf_component_register(
         "diag_snapshot.c"
         "diag_console.c"
     INCLUDE_DIRS "."
-    REQUIRES bsp provisioning ota_service
+    REQUIRES bsp provisioning ota_service player
     PRIV_REQUIRES
         console
         esp_app_format

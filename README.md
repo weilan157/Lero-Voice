@@ -10,7 +10,7 @@
 - 🔊 **立体声音箱** — ES8389 + 双 NS4150B（3 W×2），支持 BLE Audio (LC3) 与蓝牙经典播放
 - 🖥️ **带屏交互** — RGB 并口 LCD + 电容触摸，LVGL v9 界面（SquareLine Studio 设计）
 - 🎙️ **双麦克风** — 模拟双麦输入，为唤醒词与回声消除预留
-- 💾 **SD 卡扩展** — 本地音乐 / 录音 / 资源存储 / 本地 OTA 固件
+- 💾 **SD 卡扩展** — 本地音乐（MP3/WAV/FLAC/AAC…）播放 / 录音 / 资源存储 / 本地 OTA 固件
 - 🔋 **电池 + Type-C 充电** — 桌面、户外皆可用
 - 🔄 **双通道 OTA** — HTTP（GitHub Releases）+ SD 卡本地升级，支持自动回滚
 
@@ -32,6 +32,7 @@
 |------|------|
 | 核心框架 | ESP-IDF **v6.0+**（target: `esp32s31`） |
 | 音频框架 | ESP-GMF + esp_codec_dev（ES8389 官方驱动，≥ v1.3.6） |
+| 音频播放 | esp_audio_simple_player（ESP-GMF，SD 卡 MP3/WAV/FLAC/AAC/AMR/M4A） |
 | 显示 | LVGL v9 + esp_lvgl_port + SquareLine Studio |
 | 配网 | SmartConfig（ESP-TOUCH v2）+ softAP 兜底 + 微信小程序 |
 | 智能家居 | esp-mqtt（Home Assistant）+ ESP-Matter |
@@ -70,7 +71,8 @@
 | `espressif/esp-mqtt` | latest | MQTT 客户端（智能家居） |
 | `espressif/esp-matter` | latest | Matter 设备 |
 | `ghota/esp_ghota`（git 依赖） | latest | HTTP OTA |
-| 自有组件 | — | `components/bsp/`、`components/ota_service/`、`components/provisioning/`、`components/smarthome/`、`components/voice/` |
+| `espressif/esp_audio_simple_player` | ^1.0.0~2 | SD 卡音乐播放（ESP-GMF） |
+| 自有组件 | — | `components/bsp/`、`components/ota_service/`、`components/provisioning/`、`components/player/`、`components/smarthome/`、`components/voice/` |
 
 ## 快速开始
 
@@ -131,10 +133,27 @@ Lero-Voice/            # 仓库根 = ESP-IDF 工程（target: esp32s31）
 │   ├── bsp/           # 板级支持包（唯一接触硬件的层，bsp_config.h 为适配点）
 │   ├── provisioning/  # SmartConfig (ESP-TOUCH v2) + softAP 兜底
 │   ├── ota_service/   # 双通道 OTA（HTTP + SD）+ 用户确认 + 回滚自证
-│   └── diag/          # console / 日志落盘 / 快照 / 错误 / coredump
+│   ├── diag/          # console / 日志落盘 / 快照 / 错误 / coredump
+│   └── player/        # SD 卡音乐播放（ESP-GMF + ES8389）
 ├── partitions.csv     # factory + ota_0 + ota_1 + storage + coredump (16 MB)
 └── sdkconfig.defaults
 ```
+
+## 播放 SD 卡音乐
+
+1. 将音频文件放入 SD 卡 `audio/` 目录（支持 mp3 / wav / flac / aac / amr / m4a，按扩展名自动识别格式）
+2. 插入 SD 卡（`bsp_sdcard` 轮询挂载）
+3. 串口控制台（`idf.py -p COM3 monitor`）操作：
+
+```
+play audio/example.mp3    # 开始播放（也支持绝对路径 /sdcard/audio/example.mp3）
+pause / resume            # 暂停 / 继续
+stop                      # 停止
+vol 80                    # 音量 0-100
+player                    # 查询播放状态
+```
+
+> 播放管线：SD 文件 → ESP-GMF 解码（esp_audio_simple_player）→ PCM → ES8389（esp_codec_dev，I2S 主模式）。⚠️ 当前原理图 MCLK 未接线（见 PLAN 2.6 #1），**音频出声音需先完成原理图修订**。
 
 ## 开发约定
 
@@ -159,7 +178,9 @@ Lero-Voice/            # 仓库根 = ESP-IDF 工程（target: esp32s31）
 - [x] 配网框架（SmartConfig + softAP 兜底 + NVS 保存）
 - [x] OTA 双通道框架（HTTP 只升不降 + SD 强制可降级 + 用户确认 + 回滚）
 - [x] 调试诊断框架（diag: console / 日志落盘 / 快照 / 故障位图 / coredump）
-- [ ] 显示 / 音频 / 智能家居 / 语音助手 / 外壳 / 整机联调（BSP 驱动需上板实测校准）
+- [x] SD 卡音乐播放（esp_audio_simple_player + ES8389，console 控制）
+- [x] CI（.github/workflows/build.yml：构建 / 体积检查 / meta.json / Release / 静态分析）
+- [ ] 显示 / 音频录音 / 智能家居 / 语音助手 / 外壳 / 整机联调（BSP 驱动需上板实测校准）
 
 ## 许可证
 

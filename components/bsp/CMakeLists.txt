@@ -16,6 +16,7 @@ idf_component_register(
     PRIV_REQUIRES
         esp_driver_gpio
         esp_driver_i2c
+        esp_driver_i2s
         esp_driver_ledc
         esp_driver_sdmmc
         esp_adc
@@ -25,6 +26,7 @@ idf_component_register(
         esp_common
         esp_system
         esp_app_format
+        esp_codec_dev
         sdmmc
         fatfs
         spiffs

@@ -14,6 +14,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
 #include <dirent.h>
@@ -32,6 +33,7 @@
 #include "bsp_sdcard.h"
 #include "provisioning.h"
 #include "ota_service.h"
+#include "player.h"
 #include "diag.h"
 #include "diag_internal.h"
 
@@ -241,6 +243,82 @@ static int cmd_snapshot(int argc, char **argv)
     return 0;
 }
 
+static const char *s_player_state_name(player_state_t st)
+{
+    switch (st) {
+    case PLAYER_STATE_IDLE:     return "idle";
+    case PLAYER_STATE_PLAYING:  return "playing";
+    case PLAYER_STATE_PAUSED:   return "paused";
+    case PLAYER_STATE_FINISHED: return "finished";
+    case PLAYER_STATE_ERROR:    return "error";
+    default:                    return "?";
+    }
+}
+
+static int cmd_play(int argc, char **argv)
+{
+    if (argc != 2) {
+        printf("usage: play <path>  (e.g. play audio/test.mp3)\n");
+        return 1;
+    }
+    esp_err_t err = player_play_file(argv[1]);
+    printf("play: %s\n", (err == ESP_OK) ? "started" : esp_err_to_name(err));
+    return 0;
+}
+
+static int cmd_stop(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    (void)player_stop();
+    printf("stop\n");
+    return 0;
+}
+
+static int cmd_pause(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    (void)player_pause();
+    printf("pause\n");
+    return 0;
+}
+
+static int cmd_resume(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    (void)player_resume();
+    printf("resume\n");
+    return 0;
+}
+
+static int cmd_vol(int argc, char **argv)
+{
+    if (argc != 2) {
+        printf("usage: vol <0-100>\n");
+        return 1;
+    }
+    const int v = atoi(argv[1]);
+    if ((v < 0) || (v > 100)) {
+        printf("volume out of range\n");
+        return 1;
+    }
+    esp_err_t err = player_set_volume((uint8_t)v);
+    printf("volume %d: %s\n", v, (err == ESP_OK) ? "ok" : esp_err_to_name(err));
+    return 0;
+}
+
+static int cmd_player(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    player_state_t st = PLAYER_STATE_IDLE;
+    (void)player_get_state(&st);
+    printf("player state: %s\n", s_player_state_name(st));
+    return 0;
+}
+
 esp_err_t diag_console_register(void)
 {
     static const esp_console_cmd_t s_cmds[] = {
@@ -255,6 +333,12 @@ esp_err_t diag_console_register(void)
         { .command = "log",      .help = "log <tag|*> <level>",         .hint = NULL, .func = cmd_log },
         { .command = "sd",       .help = "SD card + log files",         .hint = NULL, .func = cmd_sd },
         { .command = "snapshot", .help = "latest status snapshot",      .hint = NULL, .func = cmd_snapshot },
+        { .command = "play",     .help = "play <path> (SD audio file)", .hint = NULL, .func = cmd_play },
+        { .command = "stop",     .help = "stop playback",               .hint = NULL, .func = cmd_stop },
+        { .command = "pause",    .help = "pause playback",              .hint = NULL, .func = cmd_pause },
+        { .command = "resume",   .help = "resume playback",             .hint = NULL, .func = cmd_resume },
+        { .command = "vol",      .help = "vol <0-100>",                 .hint = NULL, .func = cmd_vol },
+        { .command = "player",   .help = "player state",                .hint = NULL, .func = cmd_player },
     };
     for (size_t i = 0U; i < (sizeof(s_cmds) / sizeof(s_cmds[0])); i++) {
         const esp_err_t err = esp_console_cmd_register(&s_cmds[i]);
