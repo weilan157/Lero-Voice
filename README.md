@@ -70,7 +70,7 @@
 | `espressif/esp-mqtt` | latest | MQTT 客户端（智能家居） |
 | `espressif/esp-matter` | latest | Matter 设备 |
 | `ghota/esp_ghota`（git 依赖） | latest | HTTP OTA |
-| 自有组件 | — | `bsp/`、`components/ota_service/`、`components/provisioning/`、`components/smarthome/`、`components/voice/` |
+| 自有组件 | — | `components/bsp/`、`components/ota_service/`、`components/provisioning/`、`components/smarthome/`、`components/voice/` |
 
 ## 快速开始
 
@@ -81,9 +81,9 @@ cd esp-idf
 ./install.sh esp32s31
 ./export.sh
 
-# 2. 克隆项目
+# 2. 克隆项目（仓库根即 ESP-IDF 工程）
 git clone https://github.com/your-username/Lero-Voice.git
-cd Lero-Voice/firmware
+cd Lero-Voice
 
 # 3. 配置
 idf.py set-target esp32s31
@@ -122,9 +122,23 @@ idf.py -p COM3 flash monitor
 - **Matter**：ESP-Matter 接入 Apple Home / Google Home / Alexa
 - 配置入口：配网配置页 / 小程序的"智能家居"向导（见 [docs/PLAN.md 第 7 章](docs/PLAN.md)）
 
+## 固件工程结构
+
+```
+Lero-Voice/            # 仓库根 = ESP-IDF 工程（target: esp32s31）
+├── main/              # app_main: nvs → bsp_init → diag/prov/ota → 静态任务
+├── components/
+│   ├── bsp/           # 板级支持包（唯一接触硬件的层，bsp_config.h 为适配点）
+│   ├── provisioning/  # SmartConfig (ESP-TOUCH v2) + softAP 兜底
+│   ├── ota_service/   # 双通道 OTA（HTTP + SD）+ 用户确认 + 回滚自证
+│   └── diag/          # console / 日志落盘 / 快照 / 错误 / coredump
+├── partitions.csv     # factory + ota_0 + ota_1 + storage + coredump (16 MB)
+└── sdkconfig.defaults
+```
+
 ## 开发约定
 
-- **BSP 先行**：`firmware/bsp/` 为唯一接触硬件外设的层，应用层只调 BSP 接口；换板只改 `bsp_config.h`；**引脚映射见 [docs/PLAN.md 2.4 节](docs/PLAN.md)（已按原理图逐网络核实）**
+- **BSP 先行**：`components/bsp/` 为唯一接触硬件外设的层，应用层只调 BSP 接口；换板只改 `bsp_config.h`；**引脚映射见 [docs/PLAN.md 2.4 节](docs/PLAN.md)（已按原理图逐网络核实）**
 - **无动态内存**：自有代码禁用 `malloc/free`（MISRA C:2012 规则 21.3）；FreeRTOS 全静态 API，LVGL 使用静态池
 - **代码风格**：MISRA C:2012 子集 + AUTOSAR 风格命名；CI 静态检查（cppcheck --addon=misra + gcc -Wall -Wextra -Werror）
 
@@ -142,7 +156,7 @@ idf.py -p COM3 flash monitor
 - [ ] PCB Layout
 - [x] 工程骨架 + 代码规范（MISRA / 无动态内存）（main + bsp + components）
 - [x] BSP 框架（bsp/ 十个模块 + 故障位图）
-- [x] 配网框架（SmartConfig + softAP 兑底 + NVS 保存）
+- [x] 配网框架（SmartConfig + softAP 兜底 + NVS 保存）
 - [x] OTA 双通道框架（HTTP 只升不降 + SD 强制可降级 + 用户确认 + 回滚）
 - [x] 调试诊断框架（diag: console / 日志落盘 / 快照 / 故障位图 / coredump）
 - [ ] 显示 / 音频 / 智能家居 / 语音助手 / 外壳 / 整机联调（BSP 驱动需上板实测校准）

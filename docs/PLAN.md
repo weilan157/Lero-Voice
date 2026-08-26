@@ -229,31 +229,29 @@
 ### 3.2 项目目录结构
 
 ```
-Lero-Voice/
-├── firmware/                    # 固件源码 (ESP-IDF v6.0, target: esp32s31)
-│   ├── main/
-│   │   ├── main.c              # 主入口：bsp_init() → 任务创建（静态）→ 启动
-│   │   └── app/                # 应用层（依赖 BSP，不直接碰硬件寄存器）
-│   ├── bsp/                    # ★ BSP 板级支持包（先行开发，见 3.3）
-│   │   ├── bsp_config.h        # 唯一板级适配点：引脚映射 / 外设参数 / 缓冲区大小
-│   │   └── bsp_*.c/.h          # display / touch / codec / amplifier / sdcard / imu / buttons / power / usb
-│   ├── components/             # 应用组件（各自独立、可测试）
-│   │   ├── ota_service/        # 双通道 OTA（HTTP + SD）统一封装
-│   │   ├── provisioning/       # SmartConfig + softAP 配网
-│   │   ├── smarthome/          # 智能家居：MQTT + Matter + 意图解析（见第 7 章）
-│   │   ├── voice/              # 唤醒词 / 录音 / 回声消除（ESP-SR，待确认）
-│   │   └── diag/               # 调试诊断：console / 日志落盘 / 诊断页 / coredump（见 3.8）
-│   ├── partitions.csv          # OTA 分区表（见 8.1）
-│   ├── CMakeLists.txt
-│   └── sdkconfig.defaults      # 静态分配 / 分区 / 日志等默认配置
-├── hardware/
-│   ├── schematics/             # 嘉立创 EDA 原理图源文件（导出自 2026-08-25 版）
-│   └── pcb/                    # PCB 文件
-├── docs/                       # 方案 / 数据手册 / 原理图 PDF
-├── models/                     # 3D 打印外壳
-├── assets/                     # 图片 / UI 资源 / 音频
-├── .github/workflows/build.yml # CI/CD 自动构建 + Release + 静态检查
-├── LICENSE                     # MIT
+Lero-Voice/                    # 仓库根 = ESP-IDF 工程（target: esp32s31）
+├── main/                      # 主入口（main.c：nvs → bsp_init → diag/prov/ota → 静态任务）
+├── components/                # 组件（各自独立、可测试）
+│   ├── bsp/                   # ★ BSP：唯一接触硬件外设的层（见 3.3）
+│   │   ├── bsp_config.h       # 唯一板级适配点：引脚映射 / 外设参数 / 缓冲区大小
+│   │   └── bsp_*.c/.h         # display / touch / codec / amplifier / sdcard / imu / buttons / power / storage / usb
+│   ├── ota_service/           # 双通道 OTA（HTTP + SD）+ 用户确认（见第 8 章）
+│   ├── provisioning/          # SmartConfig + softAP 配网（见第 4 章）
+│   ├── diag/                  # 调试诊断：console / 日志落盘 / 诊断页 / coredump（见 3.8）
+│   ├── smarthome/             # 智能家居：MQTT + Matter + 意图解析（规划，见第 7 章）
+│   └── voice/                 # 唤醒词 / 录音 / 回声消除（规划，ESP-SR 待确认）
+├── partitions.csv             # OTA 分区表（见 8.1）
+├── CMakeLists.txt             # PROJECT_VER=0.1.0（OTA 版本比较基准）
+├── sdkconfig.defaults         # 静态分配 / 分区 / 日志等默认配置
+├── sdkconfig.ci               # CI 构建配置
+├── hardware/                  # 硬件设计（规划：嘉立创工程归档）
+│   ├── schematics/            # 原理图源文件（导出自 2026-08-25 版）
+│   └── pcb/                   # PCB 文件
+├── docs/                      # 方案 / 数据手册 / 原理图 PDF / 参考 SDK
+├── models/                    # 3D 打印外壳
+├── assets/                    # 图片 / UI 资源 / 音频
+├── .github/workflows/build.yml# CI/CD 自动构建 + Release + 静态检查
+├── LICENSE                    # MIT
 └── README.md
 ```
 
@@ -263,7 +261,7 @@ Lero-Voice/
 > 换板只需改 `bsp_config.h` 与对应 `bsp_*.c`，应用与组件零改动。引脚映射以 2.4 节为准。
 
 ```
-firmware/bsp/
+components/bsp/
 ├── bsp_config.h         # ★ 板级配置：GPIO 映射 / I2C 地址 / I2S 参数 / 静态缓冲区大小
 ├── bsp.h / bsp.c        # bsp_init()：按序初始化全部外设；bsp_deinit()
 ├── bsp_display.c/.h     # LCD（esp_lcd RGB 并口，IO7~19/33~35/38~45）+ 背光 PWM（BL_EN=IO54）
@@ -816,7 +814,7 @@ I2C:  SDA(IO0)/SCL(IO1) → ES8389 控制 (0x20)，与 QMI8658A(0x6A) 共用总�
 
 ## 8. OTA 升级方案（分区表 + HTTP + SD 双通道 + 用户确认）
 
-### 8.1 OTA 分区表（16 MB Flash，`firmware/partitions.csv`）
+### 8.1 OTA 分区表（16 MB Flash，`partitions.csv`）
 
 ```csv
 # ESP-IDF Partition Table — Lero Voice (16 MB Flash)
@@ -1004,16 +1002,16 @@ jobs:
         with:
           esp_idf_version: v6.0     # 支持 esp32s31 的 IDF 版本
           target: esp32s31
-          path: './firmware'
+          path: '.'
       - name: Build firmware
         run: idf.py build
       - name: Check app size (4 MB OTA slot limit)
         run: |
-          SIZE=$(stat -c%s firmware/build/lero_app.bin)
+          SIZE=$(stat -c%s build/lero_app.bin)
           test "$SIZE" -le 3984588 || { echo "app too large for OTA slot (limit 3.8 MB)"; exit 1; }
       - name: Generate OTA metadata (meta.json)
         run: |
-          cd firmware/build
+          cd build
           sha256sum lero_app.bin | awk '{print $1}' > app.sha256
           PT_SHA=$(sha256sum ../partitions.csv | awk '{print $1}')
           SIZE=$(stat -c%s lero_app.bin)
@@ -1030,9 +1028,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            firmware/build/lero_app.bin
-            firmware/build/app.sha256
-            firmware/build/meta.json
+            build/lero_app.bin
+            build/app.sha256
+            build/meta.json
 ```
 
 ### 8.11 第二轮审查：已识别风险与待完善项（v3.2）
@@ -1066,7 +1064,7 @@ cd esp-idf
 
 # 2. 克隆项目
 git clone https://github.com/your-username/Lero-Voice.git
-cd Lero-Voice/firmware
+cd Lero-Voice              # 仓库根即 ESP-IDF 工程
 
 # 3. 配置（分区表 / 回滚 / 静态分配）
 idf.py set-target esp32s31

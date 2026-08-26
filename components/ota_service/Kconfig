@@ -1,0 +1,49 @@
+menu "Lero Voice OTA Service"
+
+config LERO_OTA_HTTP_META_URL
+    string "HTTP OTA meta.json URL (GitHub latest direct link)"
+    default "https://github.com/your-username/Lero-Voice/releases/latest/download/meta.json"
+
+config LERO_OTA_TARGET
+    string "Expected hardware target in meta.json"
+    default "esp32s31-wroom-3"
+
+config LERO_OTA_SOC
+    string "Expected SoC in meta.json"
+    default "esp32s31"
+
+config LERO_OTA_BATTERY_THRESHOLD_PCT
+    int "Refuse download/switch below this battery level (%)"
+    default 20
+
+config LERO_OTA_CONFIRM_TIMEOUT_MS
+    int "User confirm timeout (ms); default 'later' keeps pending"
+    default 60000
+
+config LERO_OTA_REBOOT_COUNTDOWN_MS
+    int "Reboot countdown after confirm (ms)"
+    default 3000
+
+config LERO_OTA_HEALTH_CHECK_MS
+    int "Boot health check window before marking new image valid (ms)"
+    default 30000
+    range 1000 600000
+
+config LERO_OTA_FLASH_SIZE
+    int "Expected flash size (bytes, meta.json flash_size check)"
+    default 16777216
+
+config LERO_OTA_HTTP_TIMEOUT_MS
+    int "HTTP download timeout (ms)"
+    default 30000
+
+config LERO_OTA_SD_UPDATE_DIR
+    string "SD update directory"
+    default "/sdcard/update"
+
+config LERO_OTA_CHUNK_SIZE
+    int "OTA write chunk size (bytes)"
+    default 4096
+
+endmenu
+
