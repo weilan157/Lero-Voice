@@ -28,5 +28,17 @@ config LERO_PROV_PROBE_MAX_RETRIES
     int "Network probe retries before softAP fallback"
     default 3
 
+config LERO_PROV_RECONNECT_MIN_MS
+    int "Runtime reconnect backoff start (ms)"
+    default 5000
+
+config LERO_PROV_RECONNECT_MAX_MS
+    int "Runtime reconnect backoff cap (ms)"
+    default 300000
+
+config LERO_PROV_DONE_IDLE_MS
+    int "Provisioning DONE state duration (ms) before returning to IDLE"
+    default 30000
+
 endmenu
 

@@ -673,7 +673,10 @@ components/diag/
    a. AP 名 "LeroVoice-XXXX"（XXXX=MAC 后 4 位），无密码（局域网隔离）
    b. HTTP 配置页 http://192.168.4.1（表单：SSID/密码/保存）
    c. 保存 → NVS 写入 → 重启连接；3 分钟无操作 → 退出 AP 回待机
-5. 恢复出厂：长按功能键 10 s → 清除 NVS 全部配置 → 重启进入配网模式
+5. 恢复出厂：长按功能键 10 s → 清除 NVS 全部配置 + 格式化 storage → 重启进入配网模式
+6. 运行期断线自动重连：已配置网络掉线（路由重启/信号丢失）→ 指数退避重连
+   （5 s → 10 s → … → 5 min 封顶，`LERO_PROV_RECONNECT_*` 可调）；
+   配网成功 DONE 提示 30 s 后自动回 IDLE（连接保持）
 ```
 
 ### 4.4 小程序实现路线（三选一，可并行验证）
@@ -900,6 +903,10 @@ components/ota_service/
 8. 自检失败 / 版本自证不符 / 3 次未确认 → bootloader 自动回滚旧槽（配置保留），并清除 pending
 9. 同一 pending 版本再次检查 → 跳过重复下载，直接进入询问
 ```
+
+> **触发/确认入口**：console 命令 `ota-check`（检查+下载）· `ota-sd`（SD 强制升级）·
+> `ota-confirm`（确认并重启）· `ota-cancel`（取消）；功能键 2 短按：待确认时=确认，否则=检查更新；
+> 后续接入 UI 弹窗与语音意图（APP_EVT_OTA_CONFIRM / OTA_ABORT 事件已预留）。
 
 ### 8.5 SD 卡更新流程（强制模式，可降级）
 

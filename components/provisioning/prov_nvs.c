@@ -8,8 +8,8 @@
  * @file prov_nvs.c
  * @brief WiFi credential persistence (NVS namespace "wifi").
  *
- * Keys: ssid / password / configured. Factory reset erases the whole NVS
- * (docs/PLAN.md 4.3 step 5 / 8.6 #6).
+ * Keys: ssid / password / configured. Factory reset erases the whole NVS and
+ * formats the storage partition (docs/PLAN.md 4.3 step 5 / 8.6 #6).
  */
 
 #include <string.h>
@@ -17,6 +17,7 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "esp_system.h"
+#include "bsp_storage.h"
 #include "prov_internal.h"
 
 #define TAG "prov_nvs"
@@ -100,7 +101,12 @@ esp_err_t prov_nvs_clear_wifi(void)
 
 esp_err_t prov_nvs_factory_reset(void)
 {
-    ESP_LOGW(TAG, "factory reset: erasing NVS");
+    ESP_LOGW(TAG, "factory reset: erasing NVS + storage");
+    (void)bsp_storage_unmount();
+    const esp_err_t fmt_err = bsp_storage_format();
+    if (fmt_err != ESP_OK) {
+        ESP_LOGW(TAG, "storage format failed: %s", esp_err_to_name(fmt_err));
+    }
     esp_err_t err = nvs_flash_erase();
     if (err == ESP_OK) {
         err = nvs_flash_init();

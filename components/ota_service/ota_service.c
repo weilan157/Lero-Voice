@@ -312,6 +312,12 @@ esp_err_t ota_service_cancel(void)
     if ((s_mutex == NULL) || (xSemaphoreTake(s_mutex, pdMS_TO_TICKS(100)) != pdTRUE)) {
         return ESP_ERR_INVALID_STATE;
     }
+    if ((s_state == OTA_STATE_SWITCHING) || (s_state == OTA_STATE_REBOOTING)) {
+        /* 已切换 boot 分区：取消会导致自证失败回滚，语义混乱，拒绝 */
+        ESP_LOGW(TAG, "cancel ignored: boot partition already switched");
+        (void)xSemaphoreGive(s_mutex);
+        return ESP_ERR_INVALID_STATE;
+    }
     s_stop_confirm_timer();
     (void)ota_state_clear_pending();
     (void)ota_state_set_result(OTA_RESULT_CANCELLED, "cancelled");

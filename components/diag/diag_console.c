@@ -319,6 +319,42 @@ static int cmd_player(int argc, char **argv)
     return 0;
 }
 
+static int cmd_ota_check(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    esp_err_t err = ota_service_check_http();
+    printf("ota check: %s\n", (err == ESP_OK) ? "started" : esp_err_to_name(err));
+    return 0;
+}
+
+static int cmd_ota_sd(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    esp_err_t err = ota_service_apply_sd();
+    printf("ota sd: %s\n", (err == ESP_OK) ? "started" : esp_err_to_name(err));
+    return 0;
+}
+
+static int cmd_ota_confirm(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    esp_err_t err = ota_service_confirm();
+    printf("ota confirm: %s\n", (err == ESP_OK) ? "ok, rebooting" : esp_err_to_name(err));
+    return 0;
+}
+
+static int cmd_ota_cancel(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    esp_err_t err = ota_service_cancel();
+    printf("ota cancel: %s\n", (err == ESP_OK) ? "ok" : esp_err_to_name(err));
+    return 0;
+}
+
 esp_err_t diag_console_register(void)
 {
     static const esp_console_cmd_t s_cmds[] = {
@@ -328,6 +364,10 @@ esp_err_t diag_console_register(void)
         { .command = "periph",   .help = "BSP module status",           .hint = NULL, .func = cmd_periph },
         { .command = "err",      .help = "faults / reset reason",       .hint = NULL, .func = cmd_err },
         { .command = "ota",      .help = "OTA status",                  .hint = NULL, .func = cmd_ota },
+        { .command = "ota-check",.help = "check + download HTTP OTA",   .hint = NULL, .func = cmd_ota_check },
+        { .command = "ota-sd",   .help = "force SD card OTA (downgrade ok)", .hint = NULL, .func = cmd_ota_sd },
+        { .command = "ota-confirm", .help = "confirm pending update + reboot", .hint = NULL, .func = cmd_ota_confirm },
+        { .command = "ota-cancel",  .help = "cancel pending update",    .hint = NULL, .func = cmd_ota_cancel },
         { .command = "wifi",     .help = "WiFi status (masked)",        .hint = NULL, .func = cmd_wifi },
         { .command = "nvs",      .help = "key config overview",         .hint = NULL, .func = cmd_nvs },
         { .command = "log",      .help = "log <tag|*> <level>",         .hint = NULL, .func = cmd_log },

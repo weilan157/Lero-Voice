@@ -39,11 +39,41 @@ static int64_t s_state_start_us;
 static uint8_t s_probe_retries;
 static int64_t s_next_probe_us;
 static bool s_pending_probe;
+static bool s_configured;                /* NVS 中存在有效 WiFi 配置 */
+static bool s_connected;                 /* STA 已获得 IP */
+static int64_t s_next_reconnect_us;      /* 0 = 未安排重连 */
+static uint32_t s_reconnect_delay_ms;    /* 指数退避当前档位 */
 
 static esp_err_t s_fail_and_enter_smartconfig(void);
 static void s_wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data);
 static void s_ip_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data);
 static void s_sc_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data);
+
+/* 指数退避：返回本次等待时长，并翻倍下一档（封顶 CONFIG_LERO_PROV_RECONNECT_MAX_MS） */
+static uint32_t s_reconnect_delay(void)
+{
+    uint32_t delay = s_reconnect_delay_ms;
+    if (delay < (uint32_t)CONFIG_LERO_PROV_RECONNECT_MIN_MS) {
+        delay = (uint32_t)CONFIG_LERO_PROV_RECONNECT_MIN_MS;
+    }
+    s_reconnect_delay_ms = (delay >= (uint32_t)CONFIG_LERO_PROV_RECONNECT_MAX_MS)
+                               ? (uint32_t)CONFIG_LERO_PROV_RECONNECT_MAX_MS
+                               : (delay * 2U);
+    return delay;
+}
+
+static void s_try_reconnect(void)
+{
+    wifi_mode_t mode = WIFI_MODE_NULL;
+    if ((esp_wifi_get_mode(&mode) != ESP_OK) || (mode != WIFI_MODE_STA)) {
+        (void)prov_wifi_start_sta();    /* softAP 停止后 wifi 未启动，先回 STA */
+    }
+    const esp_err_t err = esp_wifi_connect();
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "reconnect failed: %s", esp_err_to_name(err));
+        s_next_reconnect_us = esp_timer_get_time() + (int64_t)s_reconnect_delay() * 1000;
+    }
+}
 
 /* ------------------------------------------------------------------------- */
 /* State helpers                                                             */
@@ -228,12 +258,20 @@ static void s_wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, v
             (void)esp_wifi_connect();
         }
     } else if (id == WIFI_EVENT_STA_DISCONNECTED) {
+        s_connected = false;
         if (s_state == PROV_STATE_SCANNING) {
             return;                 /* SmartConfig 阶段忽略断线 */
         }
         if (s_state == PROV_STATE_CONNECTING) {
             ESP_LOGW(TAG, "wifi connect failed");
             (void)s_fail_and_enter_smartconfig();
+            return;
+        }
+        /* IDLE / DONE：已配置网络的运行期掉线 → 安排自动重连（指数退避） */
+        if (s_configured && (s_next_reconnect_us == 0)) {
+            ESP_LOGW(TAG, "connection lost, reconnect in %lu ms",
+                     (unsigned long)s_reconnect_delay());
+            s_next_reconnect_us = esp_timer_get_time() + (int64_t)s_reconnect_delay() * 1000;
         }
     }
 }
@@ -244,6 +282,9 @@ static void s_ip_event_handler(void *arg, esp_event_base_t base, int32_t id, voi
     (void)data;
     if ((base == IP_EVENT) && (id == IP_EVENT_STA_GOT_IP)) {
         /* 事件上下文不阻塞：网络探测推迟到 prov_poll() */
+        s_connected = true;
+        s_next_reconnect_us = 0;
+        s_reconnect_delay_ms = (uint32_t)CONFIG_LERO_PROV_RECONNECT_MIN_MS;
         s_pending_probe = true;
         char ip[16];
         if (prov_get_sta_ip(ip, sizeof(ip)) == ESP_OK) {
@@ -285,6 +326,7 @@ static esp_err_t s_fail_and_enter_smartconfig(void)
 {
     (void)prov_smartconfig_stop();
     (void)prov_nvs_clear_wifi();
+    s_configured = false;
     prov_set_state(PROV_STATE_IDLE, "connect failed");
     return prov_enter_smartconfig();
 }
@@ -339,6 +381,8 @@ esp_err_t prov_start(void)
     if ((err != ESP_OK) && (err != ESP_ERR_NVS_NOT_FOUND)) {
         ESP_LOGE(TAG, "load wifi config failed: %s", esp_err_to_name(err));
     }
+    s_configured = configured && (ssid[0] != '\0');
+    s_reconnect_delay_ms = (uint32_t)CONFIG_LERO_PROV_RECONNECT_MIN_MS;
     if (configured && (ssid[0] != '\0')) {
         ESP_LOGI(TAG, "saved config found, connecting %s", ssid);
         err = prov_wifi_connect_sta(ssid, pwd);
@@ -418,6 +462,7 @@ esp_err_t prov_poll(void)
                                                     pwd, sizeof(pwd)) == ESP_OK) {
                         (void)prov_nvs_save_wifi(ssid, pwd);
                     }
+                    s_configured = true;
                     (void)prov_smartconfig_stop();
                     s_provision_session = false;
                     prov_set_state(PROV_STATE_DONE, "provisioning ok");
@@ -460,6 +505,26 @@ esp_err_t prov_poll(void)
             prov_set_state(PROV_STATE_IDLE, "ap timeout");
         }
         break;
+    case PROV_STATE_IDLE:
+    case PROV_STATE_DONE: {
+        if (s_state == PROV_STATE_DONE) {
+            /* 配网成功提示期结束后回到 IDLE（连接状态保持） */
+            if ((now - s_state_start_us) >
+                ((int64_t)CONFIG_LERO_PROV_DONE_IDLE_MS * 1000)) {
+                prov_set_state(PROV_STATE_IDLE, "done->idle");
+            }
+        }
+        /* 运行期掉线自动重连（指数退避，见 s_reconnect_delay） */
+        if ((s_next_reconnect_us != 0) && (now >= s_next_reconnect_us)) {
+            s_next_reconnect_us = 0;
+            if (s_connected || prov_wifi_is_connected()) {
+                s_connected = true;
+            } else {
+                s_try_reconnect();
+            }
+        }
+        break;
+    }
     default:
         break;
     }

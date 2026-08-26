@@ -6,6 +6,7 @@ idf_component_register(
         "prov_softap.c"
     INCLUDE_DIRS "."
     PRIV_REQUIRES
+        bsp
         esp_wifi
         esp_netif
         esp_event

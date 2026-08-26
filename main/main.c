@@ -41,10 +41,11 @@ typedef enum {
     APP_EVT_BTN1_LONG = 1,      /*< 功能键1 长按：进入配网 */
     APP_EVT_BTN1_VERY_LONG,     /*< 功能键1 超长按：恢复出厂 */
     APP_EVT_BTN2_LONG,          /*< 功能键2 长按：检查 OTA */
+    APP_EVT_BTN2_SHORT,         /*< 功能键2 短按：待确认时=确认升级，否则=检查 OTA */
     APP_EVT_BTN3_SHORT,         /*< 功能键3 短按：状态灯切换 */
     APP_EVT_OTA_CHECK,          /*< 触发 OTA 检查（HTTP 通道） */
-    APP_EVT_OTA_CONFIRM,        /*< 用户确认升级（预留 UI/语音入口） */
-    APP_EVT_OTA_ABORT,          /*< 用户取消升级（预留 UI/语音入口） */
+    APP_EVT_OTA_CONFIRM,        /*< 用户确认升级（UI/语音/按键入口） */
+    APP_EVT_OTA_ABORT,          /*< 用户取消升级（UI/语音/按键入口） */
 } app_event_t;
 
 static StackType_t s_event_queue_storage[CONFIG_LERO_APP_EVENT_QUEUE_LEN];
@@ -122,6 +123,8 @@ static void s_buttons_cb(bsp_button_id_t button, bsp_button_event_t event)
     } else if (button == BSP_BTN_ID_2) {
         if (event == BSP_BTN_EVENT_LONG_PRESS) {
             app_event_post(APP_EVT_BTN2_LONG);
+        } else if (event == BSP_BTN_EVENT_SHORT_PRESS) {
+            app_event_post(APP_EVT_BTN2_SHORT);
         }
     } else if (button == BSP_BTN_ID_3) {
         if (event == BSP_BTN_EVENT_SHORT_PRESS) {
@@ -196,6 +199,14 @@ static void s_sys_task(void *arg)
             break;
         case APP_EVT_BTN2_LONG:
             app_event_post(APP_EVT_OTA_CHECK);
+            break;
+        case APP_EVT_BTN2_SHORT:
+            /* 待确认时短按 = 确认升级；否则 = 检查更新 */
+            if (ota_service_get_state() == OTA_STATE_PENDING_APPLY) {
+                app_event_post(APP_EVT_OTA_CONFIRM);
+            } else {
+                app_event_post(APP_EVT_OTA_CHECK);
+            }
             break;
         case APP_EVT_BTN3_SHORT:
             s_led_on = !s_led_on;

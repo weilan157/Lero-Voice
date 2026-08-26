@@ -107,14 +107,16 @@ idf.py -p COM3 flash monitor
 2. 手机连接 **2.4G** WiFi（SmartConfig 不支持 5G）
 3. 打开微信小程序 → 输入 WiFi 密码 → 点击"配网"
 4. 成功：提示音 2 短声 + 屏幕显示"联网成功"；60 s 超时自动转 **softAP 兜底**（AP 名 `LeroVoice-XXXX`，浏览器访问 `192.168.4.1` 配置）
-5. 恢复出厂：长按功能键 10 s
+5. 恢复出厂：长按功能键 10 s（擦除 NVS + 格式化 storage）
+6. **断线自动重连**：联网后掉线（路由重启等）自动指数退避重连（5 s → 5 min 封顶）
 
 > 详细步骤与固件内部流程见 [docs/PLAN.md 第 4 章](docs/PLAN.md)。
 
 ## OTA 升级（双通道）
 
-- **HTTP**：完全跟随 GitHub Releases 最新正式版（**只升不降**），`ota_task` 定时检查（latest 直链），拉取完整元信息 `meta.json`（版本/目标/SHA-256/说明等）→ 校验后下载到非运行槽 → **切换槽与重启由用户确认**（界面弹窗或语音指令，超时默认"稍后"）→ 失败自动回滚
-- **SD 卡**：将 `lero_app.bin` + `lero_app.bin.sha256`（可选 `update.json`）放入 SD 卡 `update/` 目录，插卡或界面点击"本地升级"即可 —— **强制模式，可降级**（HTTP 不可降级），断网可用
+- **HTTP**：完全跟随 GitHub Releases 最新正式版（**只升不降**），`ota_task` 定时检查（latest 直链），拉取完整元信息 `meta.json`（版本/目标/SHA-256/说明等）→ 校验后下载到非运行槽 → **切换槽与重启由用户确认**（console `ota-confirm` / 功能键 2 短按 / 后续 UI 弹窗与语音，超时默认"稍后"）→ 失败自动回滚
+- **SD 卡**：将 `lero_app.bin` + `lero_app.bin.sha256`（可选 `update.json`）放入 SD 卡 `update/` 目录，console 执行 `ota-sd` 触发（后续界面"本地升级"入口）—— **强制模式，可降级**（HTTP 不可降级），断网可用
+- 控制台：`ota`（状态）· `ota-check` · `ota-sd` · `ota-confirm` · `ota-cancel`
 - **升级不影响配置**：OTA 只写 app 分区，NVS 用户配置与 storage 分区全程不触碰
 - 分区表：`factory + ota_0 + ota_1 + storage`（16 MB，见 [docs/PLAN.md 第 8 章](docs/PLAN.md)）
 
