@@ -207,6 +207,7 @@
 | 5 | IO36 / IO37、IO60 未使用 | 可作为 MCLK / SD_DET / 红外发射等扩展资源 |
 | 6 | ⚠️ **IMU 中断未接主控**：QMI8658A 的 INT1/INT2 引脚无网络（仅 SDA/SCL/3V3/GND） | IMU 只能轮询读取，无法中断唤醒 / 手势中断；BSP 按轮询设计（后续要手势唤醒需改版补连） |
 | 7 | ⚠️ **IMU 地址脚 SA0 悬空**：SDO/SA0 未接，地址依赖内部默认（原理图标注 0x6A） | BSP 初始化时先探测 0x6A / 0x68 两个地址再锁定 |
+| 8 | ⚠️ **ADC 通道映射与衰减（上板实测确认）**：GPIO50/51 属 **ADC2**（CH0/CH1；ADC1 仅 GPIO42~49），且 S31 衰减需用 `ADC_ATTEN_DB_11`（`DB_12` 运行时报 invalid attenuation） | 已按 ADC2 + DB_11 修正；ADC2 与 Wi-Fi 活跃时的共存性需上板实测（若读数异常改用 ADC1 引脚或连续采样） |
 
 ---
 
@@ -306,7 +307,7 @@ components/bsp/
 | 1 | 原 BSP 缺 **storage 文件系统模块**：UI 资源、唤醒词、设备映射表、OTA 暂存都需要 storage 分区 | 新增 `bsp_storage`（SPIFFS 挂载/格式化/空间查询），开发顺序第 4 步 |
 | 2 | **背光时序**：`bsp_display_init` 若立即点亮背光，首帧渲染前会白屏 | 约定：背光默认关闭，UI 首帧渲染完成才 `bsp_display_backlight_set(>0)` |
 | 3 | **功放防爆音**：codec 与 amplifier 分离但无时序约定 | 约定：上电顺序 = codec 初始化 → PA 保持静音 → 首次播放前才 `bsp_amp_enable`；音源切换先 mute 再操作 |
-| 4 | **RGB 帧缓冲静态化**：无动态内存约束下，帧缓冲必须静态分配进 PSRAM | 用 `EXT_RAM_BSS_ATTR`（或链接段）声明静态数组，传入 `esp_lcd_rgb_panel_config_t.buf1/.buf2`；按 480×854×2B×2 帧 ≈ 1.6 MB 预算 |
+| 4 | **RGB 帧缓冲静态化**：无动态内存约束下，帧缓冲必须静态分配进 PSRAM | 用 `EXT_RAM_BSS_ATTR`（或链接段）声明静态数组，传入 `esp_lcd_rgb_panel_config_t.buf1/.buf2`；**S31 驱动不支持 18-bit，按 16-bit RGB565**：480×854×2B×2 帧 ≈ 1.6 MB 预算（上板实测后按面板色深细化） |
 | 5 | **充电状态盲区**：LGS5500EP 无 I2C，LED_BAT 由充电芯片直驱，固件读不到 | `bsp_power_get_charge_state()` 用 BUS_ADC 电压 + BAT 电压变化率推断；改版时可将 LED_BAT 兼接 GPIO 输入 |
 | 6 | **SD_DET 未接主控**（见 2.6） | `bsp_sdcard` 不做中断热插拔，改为：轮询挂载状态 / 界面按钮触发 |
 | 7 | **IMU 中断未接 + SA0 悬空**（见 2.6） | `bsp_imu` 轮询模式；初始化先探测 0x6A/0x68 地址 |
@@ -968,7 +969,7 @@ SD 卡目录约定：
 |---|------|------|
 | 1 | 分区表固定 | OTA 只写 app 分区与 otadata；分区表变更仅随"恢复出厂镜像"发布，不随 OTA |
 | 2 | NVS 不触碰 | 用户命名空间（`wifi` / `smarthome` / `audio` / `ui` …）升级全程不读不写不删；OTA 状态只写独立命名空间 `ota/*` |
-| 3 | storage 不格式化 | SPIFFS 分区升级不操作；挂载失败仅告警（诊断页展示），不自动格式化 |
+| 3 | storage 不格式化 | SPIFFS 分区升级不操作；挂载失败仅告警（诊断页展示），不自动格式化（**唯一例外：首次上电出厂态自动格式化一次**，之后恢复出厂走长按 10 s） |
 | 4 | 配置向前兼容 | 固件内置 NVS schema 版本（`sys/schema_version`）+ 迁移钩子：新固件首次启动按需迁移旧键、补齐默认值 |
 | 5 | 失败不影响配置 | 半包/校验失败不切换槽；自动回滚后配置原样保留 |
 | 6 | 唯一清配置入口 | 长按功能键 10 s 恢复出厂（擦 NVS + storage），与 OTA 完全解耦 |

@@ -24,7 +24,10 @@
 
 #define TAG "bsp_display"
 
-#define LCD_COLOR_BYTES         3U            /* RGB888 */
+/* S31 esp_lcd RGB 面板不支持 18-bit（运行时报 unsupported data width 18），
+ * 18 线面板以 16-bit RGB565 驱动（高 5/6 位有效，颜色略有损失，MVP 可接受；
+ * 若要完整 18-bit 色深需 24 线面板或后续驱动支持）。 */
+#define LCD_COLOR_BYTES         2U            /* RGB565 */
 #define LCD_FB_BYTES            ((uint32_t)CONFIG_LERO_LCD_H_RES * CONFIG_LERO_LCD_V_RES * LCD_COLOR_BYTES)
 #define BL_DUTY_MAX             255U
 
@@ -132,9 +135,9 @@ esp_err_t bsp_display_init(void)
             .vsync_front_porch = CONFIG_LERO_LCD_VFP,
             .flags.pclk_active_neg = true,
         },
-        .data_width = 18,
-        .in_color_format = LCD_COLOR_FMT_RGB888,
-        .out_color_format = LCD_COLOR_FMT_RGB888,   /* 18-bit 并口：驱动内部降位输出 */
+        .data_width = 16,
+        .in_color_format = LCD_COLOR_FMT_RGB565,
+        .out_color_format = LCD_COLOR_FMT_RGB565,   /* S31 不支持 18-bit */
         .num_fbs = 2,
         .user_fbs = { s_fb0, s_fb1 },
         .bounce_buffer_size_px = 0,

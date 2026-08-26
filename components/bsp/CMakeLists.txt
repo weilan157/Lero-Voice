@@ -30,6 +30,7 @@ idf_component_register(
         sdmmc
         fatfs
         spiffs
+        nvs_flash
         log
         freertos
 )

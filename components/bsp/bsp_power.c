@@ -56,8 +56,15 @@ static esp_err_t s_adc_read_channel(adc_channel_t channel, uint32_t *mv)
 
 esp_err_t bsp_power_init(void)
 {
+    /* S31 ADC 映射（soc/esp32s31/adc_channel.h）：
+     *   ADC1: GPIO42~49 = CH0~7
+     *   ADC2: GPIO50~57 = CH0~7（BAT_ADC=IO50→ADC2_CH0, BUS_ADC=IO51→ADC2_CH1）
+     * 衰减使用 ADC_ATTEN_DB_11（DB_12 在 S31 非法，运行时报 invalid attenuation）。
+     * 注意：ADC2 与 Wi-Fi 的共存性需上板实测（部分芯片 ADC2 在 Wi-Fi 活跃时
+     * 读数不可用；若受影响需改用 ADC1 引脚或连续采样模式）。 */
+#define ADC_MONITOR_UNIT  ADC_UNIT_2
     adc_oneshot_unit_init_cfg_t unit_cfg = {
-        .unit_id = ADC_UNIT_1,
+        .unit_id = ADC_MONITOR_UNIT,
         .ulp_mode = ADC_ULP_MODE_DISABLE,
     };
     esp_err_t err = adc_oneshot_new_unit(&unit_cfg, &s_adc);
@@ -67,7 +74,7 @@ esp_err_t bsp_power_init(void)
     }
 
     adc_oneshot_chan_cfg_t chan_cfg = {
-        .atten = ADC_ATTEN_DB_12,
+        .atten = ADC_ATTEN_DB_11,
         .bitwidth = ADC_BITWIDTH_DEFAULT,
     };
     err = adc_oneshot_config_channel(s_adc, (adc_channel_t)CONFIG_LERO_BAT_ADC_CHANNEL, &chan_cfg);
@@ -85,9 +92,9 @@ esp_err_t bsp_power_init(void)
      * 因此仅在支持该方案的芯片上启用，否则直接走近似换算。 */
 #if ADC_CALI_SCHEME_CURVE_FITTING_SUPPORTED
     adc_cali_curve_fitting_config_t cali_cfg = {
-        .unit_id = ADC_UNIT_1,
+        .unit_id = ADC_MONITOR_UNIT,
         .chan = (adc_channel_t)CONFIG_LERO_BAT_ADC_CHANNEL,
-        .atten = ADC_ATTEN_DB_12,
+        .atten = ADC_ATTEN_DB_11,
         .bitwidth = ADC_BITWIDTH_DEFAULT,
     };
     err = adc_cali_create_scheme_curve_fitting(&cali_cfg, &s_cali);

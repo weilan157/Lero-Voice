@@ -81,11 +81,11 @@ config LERO_LCD_BL_FREQ_HZ
     default 5000
 
 config LERO_BAT_ADC_CHANNEL
-    int "Battery ADC channel (see S31 datasheet ADC table)"
+    int "Battery ADC channel (ADC2: GPIO50=ch0 ... GPIO57=ch7)"
     default 0
 
 config LERO_BUS_ADC_CHANNEL
-    int "Bus voltage ADC channel"
+    int "Bus voltage ADC channel (ADC2: GPIO50=ch0 ... GPIO57=ch7)"
     default 1
 
 config LERO_BAT_DIVIDER_RATIO
