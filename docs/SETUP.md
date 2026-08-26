@@ -124,16 +124,16 @@ idf.py -p /dev/ttyUSB0 flash monitor   # Linux/macOS 端口示例
 
 | 组成 | 说明 |
 |------|------|
-| **编译容器** | `espressif/esp-idf-ci-action@v1` 是官方 **`espressif/idf:v6.0` Docker 镜像**的封装（`esp_idf_version` 参数 = Docker Hub tag）。镜像内含全部目标工具链（含 **esp32s31**），无需在 CI 里跑 `install.sh` |
+| **编译容器** | `espressif/esp-idf-ci-action@v1` 是官方 **`espressif/idf` Docker 镜像**的封装（`esp_idf_version` 参数 = Docker Hub tag）。**使用 `release-v6.0`**（跟踪 v6.0 分支最新，含 **esp32s31** 工具链）——不要用 `v6.0`：该 tag 是 v6.0.0 发布时构建的旧镜像，**不含 esp32s31 工具链** |
 | **首次拉取** | 镜像约 4.3 GB，首次较慢；GitHub 自动缓存容器层，同 tag 后续秒级 |
 | **增量编译** | 挂载 `.ccache` 卷 + `IDF_CCACHE_ENABLE=1`，由 `actions/cache` 跨运行持久化（首次全量，之后增量） |
 | **组件拉取** | 容器内 `idf.py build` 自动从组件仓库下载 `idf_component.yml` 依赖 |
-| **版本锁定** | `esp_idf_version: v6.0` 必须匹配 Docker Hub 的 `espressif/idf` tag；换 IDF 版本只改这一处 |
+| **版本锁定** | `esp_idf_version` 必须匹配 Docker Hub 的 `espressif/idf` tag；换 IDF 版本只改这一处 |
 
 **本地复现 CI 编译**（与 CI 完全一致的环境）：
 
 ```bash
-docker run --rm -v "$(pwd):/workspace" -w /workspace espressif/idf:v6.0 \
+docker run --rm -v "$(pwd):/workspace" -w /workspace espressif/idf:release-v6.0 \
   bash -c ". \$IDF_PATH/export.sh && idf.py set-target esp32s31 && idf.py build"
 ```
 

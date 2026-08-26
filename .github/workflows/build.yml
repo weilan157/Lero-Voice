@@ -32,7 +32,10 @@ jobs:
 
       - uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v6.0        # = espressif/idf:v6.0（Docker Hub tag）
+          # 注意：不要用 v6.0 —— 该 tag 是 v6.0.0 发布时构建的旧镜像，
+          # 不含 esp32s31 工具链（toolchain-esp32s31.cmake not found）。
+          # release-v6.0 跟踪 v6.0 分支最新（v6.0.2，含 esp32s31）。
+          esp_idf_version: release-v6.0
           target: esp32s31
           path: '.'
           # 注意：extra_docker_args 必须为单行（action 将其嵌入多行 docker

@@ -1048,7 +1048,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v6.0     # 支持 esp32s31 的 IDF 版本
+          esp_idf_version: release-v6.0  # v6.0 分支最新镜像（含 esp32s31 工具链；v6.0 旧镜像不含）
           target: esp32s31
           path: '.'
       - name: Build firmware
