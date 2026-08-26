@@ -3,4 +3,4 @@
 dependencies:
   espressif/esp_codec_dev: "^1.6.2"            # ES8389 官方驱动（播放+录音）
   espressif/esp_audio_simple_player: "^1.0.0~2" # ESP-GMF 播放器（MP3/WAV/FLAC/AAC...）
-  idf: ">=6.0"
+  idf: ">=6.1"

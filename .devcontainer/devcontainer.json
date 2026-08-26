@@ -1,7 +1,10 @@
 {
 	"name": "ESP-IDF QEMU",
 	"build": {
-		"dockerfile": "Dockerfile"
+		"dockerfile": "Dockerfile",
+		"args": {
+			"DOCKER_TAG": "release-v6.1"
+		}
 	},
 	"customizations": {
 		"vscode": {

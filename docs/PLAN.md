@@ -216,7 +216,7 @@
 
 | 功能模块 | 选型方案 | 说明 |
 |----------|----------|------|
-| **核心框架** | **ESP-IDF v6.0+**（target: `esp32s31`） | ESP32-S31 官方支持的最低主线版本 |
+| **核心框架** | **ESP-IDF v6.1+**（target: `esp32s31`） | esp32s31 支持的最低版本线（**v6.0 全系无 S31 工具链**） |
 | **音频框架** | **ESP-GMF**（`espressif/esp-gmf`）+ **esp_codec_dev** | S31 官方多媒体框架；**ES8389 已被 esp_codec_dev ≥ v1.3.6 官方支持（播放+录音）** |
 | **蓝牙音频** | ESP-BLE-AUDIO / BT Classic | S31 原生支持 **BLE Audio（LC3）** 与蓝牙经典 A2DP |
 | **显示框架** | LVGL v9 + **esp_lvgl_port** | 乐鑫官方适配组件（注意：不是"esp_lvgl_adapter"） |
@@ -988,7 +988,7 @@ SD 卡目录约定：
   "app_bin_size": 1234567,
   "app_sha256": "8f4a...（64 位 hex）",
   "partition_table_sha256": "a3c9...（64 位 hex）",
-  "idf_version": "v6.0.2",
+  "idf_version": "v6.1.0",
   "build_date": "2026-09-01T10:00:00Z",
   "release_notes": "修复 MCLK 驱动；新增 Matter 支持",
   "signature": "base64(RSA/ECDSA 签名，量产必带)"
@@ -1048,7 +1048,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: release-v6.0  # v6.0 分支最新镜像（含 esp32s31 工具链；v6.0 旧镜像不含）
+          esp_idf_version: release-v6.1  # v6.1 分支镜像（首个含 esp32s31 工具链；v6.0 全系不含）
           target: esp32s31
           path: '.'
       - name: Build firmware
@@ -1070,7 +1070,7 @@ jobs:
             '{version:$v, min_app_version:"v1.0.0", target:"esp32s31-wroom-3",
               soc:"esp32s31", flash_size:16777216, psram:true,
               app_bin:"Lero-Voice.bin", app_bin_size:$n, app_sha256:$s,
-              partition_table_sha256:$p, idf_version:"v6.0.2",
+              partition_table_sha256:$p, idf_version:"v6.1.0",
               build_date:(now|todateiso8601), release_notes:"", signature:""}' > meta.json
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -1106,7 +1106,7 @@ jobs:
 > 完整指南（依赖安装 / 首次配置 / VS Code / 常见问题）见 [docs/SETUP.md](SETUP.md)。
 
 ```bash
-# 1. 安装 ESP-IDF v6.0+（esp32s31 target 最低要求）
+# 1. 安装 ESP-IDF（master 或 release/v6.1；v6.0 无 esp32s31 支持）
 git clone --recursive https://github.com/espressif/esp-idf.git
 cd esp-idf
 ./install.sh esp32s31
@@ -1169,7 +1169,7 @@ idf.py -p COM3 flash monitor
 | 2 | **麦克风型号待定** | 原理图为模拟双麦；选型后需调 ES8389 增益与偏置，远场性能建议对标 Korvo-1 双麦阵列 |
 | 3 | **ESP-SR 唤醒词对 S31 的支持** | 若暂不支持，可先用 ESP Private Agents 或云端唤醒（VAD + 按键/手势唤醒兜底） |
 | 4 | **无动态内存约束下的内存规划** | 任务栈/队列/LVGL 池/帧缓冲全部静态化后，需按 512 KB SRAM + 16 MB PSRAM 预算精确核算，BSP 阶段逐模块实测 |
-| 5 | **模块新上市** | S31 2026-07 才量产，驱动/工具链迭代快；固件锁定 IDF v6.x LTS 分支并随官方更新 |
+| 5 | **模块/工具链新上市** | S31 2026-07 才量产；esp32s31 支持仅在 IDF **v6.1+**（v6.0 无）——固件锁定 release/v6.1（或 master）并随官方更新 |
 | 6 | **高温与散热** | 模块 -40~+85 °C；连续播放 3 W×2 评估温升，外壳开孔 |
 | 7 | **Wi-Fi 6 路由器配网兼容性** | SmartConfig 广播帧在不同路由上表现不一，联调覆盖主流品牌，softAP 兜底 |
 | 8 | **BLE Audio 生态** | LE Audio 为亮点功能，但手机兼容性需实测（iOS/Android 各版本） |
@@ -1211,10 +1211,10 @@ idf.py -p COM3 flash monitor
 
 | 资料 | 版本 | 用途 |
 |------|------|------|
-| [ESP-IDF Programming Guide (esp32s31)](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s31/index.html) | v6.0+ | 开发指南 / API 参考 |
-| [ESP-IDF 分区表文档](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s31/api-guides/partition-tables.html) | v6.0 | 分区表设计 |
-| [ESP-IDF OTA 文档](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s31/api-reference/system/ota.html) | v6.0 | esp_ota API / 回滚 |
-| [ESP-IDF SmartConfig 示例](https://github.com/espressif/esp-idf/tree/master/examples/wifi/smart_config) | v6.0 | 配网参考 |
+| [ESP-IDF Programming Guide (esp32s31)](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s31/index.html) | v6.1+ | 开发指南 / API 参考 |
+| [ESP-IDF 分区表文档](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s31/api-guides/partition-tables.html) | v6.1 | 分区表设计 |
+| [ESP-IDF OTA 文档](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s31/api-reference/system/ota.html) | v6.1 | esp_ota API / 回滚 |
+| [ESP-IDF SmartConfig 示例](https://github.com/espressif/esp-idf/tree/master/examples/wifi/smart_config) | v6.1 | 配网参考 |
 | [esp_codec_dev](https://components.espressif.com/components/espressif/esp_codec_dev) | ≥1.3.6（当前 1.6.2） | **ES8389 驱动（播放+录音）** |
 | [ESP-GMF](https://github.com/espressif/esp-gmf) | latest | 音频播放/处理管道 |
 | [esp_lvgl_port](https://components.espressif.com/components/espressif/esp_lvgl_port) | ^2.3.0（当前 2.9.0） | LVGL 适配层 |
