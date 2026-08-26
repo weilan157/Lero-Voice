@@ -13,14 +13,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ---- 编译环境说明（docs/SETUP.md "CI 编译环境"）----
+      # espressif/esp-idf-ci-action 是官方 espressif/idf Docker 镜像的封装：
+      #   - esp_idf_version 必须是 Docker Hub tag（v6.0 = espressif/idf:v6.0，
+      #     内含全部目标工具链，含 esp32s31；IDF v6.0 为 S31 支持版本）
+      #   - 镜像约 4.3GB：首次拉取较慢，GitHub 会自动缓存容器层，后续秒级
+      #   - 通过挂载 .ccache 卷 + IDF_CCACHE_ENABLE 实现增量编译缓存，
+      #     由 actions/cache 跨运行持久化（首次全量，之后增量）
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-${{ runner.os }}-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ github.ref }}-
+            ccache-${{ runner.os }}-
+
       - uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v6.0        # 支持 esp32s31 的 IDF 版本（docs/PLAN.md 8.10）
+          esp_idf_version: v6.0        # = espressif/idf:v6.0（Docker Hub tag）
           target: esp32s31
           path: '.'
-
-      - name: Build firmware
-        run: idf.py build
+          extra_docker_args: |
+            -v ${{ github.workspace }}/.ccache:/root/.ccache
+            -e CCACHE_DIR=/root/.ccache
+            -e IDF_CCACHE_ENABLE=1
 
       - name: App size check (4 MB OTA slot limit)
         run: |
@@ -70,7 +88,7 @@ jobs:
             --suppress=missingIncludeSystem --suppress=missingInclude \
             --inline-suppr \
             -Icomponents/bsp -Icomponents/ota_service -Icomponents/provisioning \
-            -Icomponents/diag -Icomponents/player -Imain \
+            -Icomponents/diag -Icomponents/player -Icomponents/voice -Imain \
             components main 2>&1 | tee cppcheck.log
           echo "--- summary ---"
           grep -c "error:" cppcheck.log || true

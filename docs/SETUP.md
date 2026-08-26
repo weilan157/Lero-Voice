@@ -118,7 +118,35 @@ idf.py -p /dev/ttyUSB0 flash monitor   # Linux/macOS 端口示例
 | 设备反复重启 | 串口监控看日志；`err` 命令查看复位原因；`idf.py coredump-info` 分析崩溃 |
 | 音频无声 | 检查原理图 MCLK 接线（PLAN 2.6 #1）；console `periph` 看 codec 状态 |
 
-## 7. 相关文档
+## 7. CI 编译环境（如何解决/复现）
+
+仓库 CI（`.github/workflows/build.yml`）的编译环境机制：
+
+| 组成 | 说明 |
+|------|------|
+| **编译容器** | `espressif/esp-idf-ci-action@v1` 是官方 **`espressif/idf:v6.0` Docker 镜像**的封装（`esp_idf_version` 参数 = Docker Hub tag）。镜像内含全部目标工具链（含 **esp32s31**），无需在 CI 里跑 `install.sh` |
+| **首次拉取** | 镜像约 4.3 GB，首次较慢；GitHub 自动缓存容器层，同 tag 后续秒级 |
+| **增量编译** | 挂载 `.ccache` 卷 + `IDF_CCACHE_ENABLE=1`，由 `actions/cache` 跨运行持久化（首次全量，之后增量） |
+| **组件拉取** | 容器内 `idf.py build` 自动从组件仓库下载 `idf_component.yml` 依赖 |
+| **版本锁定** | `esp_idf_version: v6.0` 必须匹配 Docker Hub 的 `espressif/idf` tag；换 IDF 版本只改这一处 |
+
+**本地复现 CI 编译**（与 CI 完全一致的环境）：
+
+```bash
+docker run --rm -v "$(pwd):/workspace" -w /workspace espressif/idf:v6.0 \
+  bash -c ". \$IDF_PATH/export.sh && idf.py set-target esp32s31 && idf.py build"
+```
+
+**常见问题**：
+
+| 问题 | 处理 |
+|------|------|
+| CI 报 `image not found` / tag 无效 | `esp_idf_version` 必须是 [Docker Hub 已发布的 tag](https://hub.docker.com/r/espressif/idf/tags)（如 `v6.0`、`v6.0.1`） |
+| 拉镜像超时 | GitHub 托管 runner 直连 Docker Hub 一般正常；自托管 runner 需配置镜像加速 |
+| 首次构建慢 | 属正常（镜像层 + 全量编译）；第二次起有 ccache 增量 |
+| 组件下载失败 | 偶发网络问题，重跑即可；`idf.py reconfigure` 可单独重拉组件 |
+
+## 8. 相关文档
 
 - 项目方案（引脚/BSP/OTA/配网/调试）：[PLAN.md](PLAN.md)
 - 快速开始（精简版）：[README.md](../README.md)

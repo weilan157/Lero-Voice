@@ -97,5 +97,7 @@ Desktop.ini
 # test output & cache
 Testing/
 .cache/
+# CI ccache (see .github/workflows/build.yml)
+.ccache/
 # vcpkg
 vcpkg_installed/
