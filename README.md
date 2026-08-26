@@ -52,6 +52,8 @@
 | **ESP-IDF** | **v6.0+**（esp32s31 支持的最低主线版本） | CMake/Ninja/工具链由 `install.sh` 自动安装 |
 | 串口驱动 | CP210x / CH340（按调试器芯片安装） | Windows 下需手动安装 |
 
+> 详细安装步骤、首次配置、VS Code 与常见问题见 [🛠️ 开发环境搭建指南](docs/SETUP.md)。
+
 ### 硬件
 
 - Lero Voice 主板（PCB 打样前可用 ESP32-S31 系列开发板先行验证，如 ESP32-S31-Korvo-1）
@@ -165,6 +167,7 @@ player                    # 查询播放状态
 
 ## 文档
 
+- [🛠️ 开发环境搭建指南](docs/SETUP.md) — 依赖安装 / 首次配置 / VS Code / 常见问题排查
 - [📋 项目完整方案（v3.3）](docs/PLAN.md) — 硬件 / 逐模块引脚表 / 原理图核对记录 / BSP / 代码规范 / 配网详细步骤 / 智能家居 / OTA 双通道 / 分区表 / 调试诊断 / 里程碑 / 资料清单
 - [原理图（2026-08-25）](docs/SCH_Schematic1_1_2026-08-25.pdf)
 - [ESP32-S31-WROOM-3 数据手册（CN）](docs/esp32-s31-wroom-3_datasheet_cn.pdf)

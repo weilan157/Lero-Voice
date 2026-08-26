@@ -1,0 +1,3 @@
+# CI 构建专用配置覆盖（sdkconfig.defaults 基础上的增量）
+# 目前使用默认配置即可；需要差异化时在此追加，例如：
+# CONFIG_LOG_DEFAULT_LEVEL_INFO=y

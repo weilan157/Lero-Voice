@@ -75,9 +75,9 @@ venv/
 env/
 
 # ---- Language servers / IDE ----
+# 注意：.vscode/ 已提交共享配置（extensions/settings/c_cpp/tasks），勿整体忽略
 .clangd/
 .ccls-cache/
-.vscode/
 # User-specific configuration files
 *.user
 *.workspace

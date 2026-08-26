@@ -1072,6 +1072,8 @@ jobs:
 
 ## 9. 开发环境搭建
 
+> 完整指南（依赖安装 / 首次配置 / VS Code / 常见问题）见 [docs/SETUP.md](SETUP.md)。
+
 ```bash
 # 1. 安装 ESP-IDF v6.0+（esp32s31 target 最低要求）
 git clone --recursive https://github.com/espressif/esp-idf.git
@@ -1079,7 +1081,7 @@ cd esp-idf
 ./install.sh esp32s31
 ./export.sh
 
-# 2. 克隆项目
+# 2. 克隆项目（仓库根即 ESP-IDF 工程）
 git clone https://github.com/your-username/Lero-Voice.git
 cd Lero-Voice              # 仓库根即 ESP-IDF 工程
 
@@ -1089,11 +1091,15 @@ idf.py menuconfig
 #   - Partition Table → Custom partition table CSV → partitions.csv
 #   - Bootloader config → App rollback enable
 #   - Component config → LVGL / ESP-GMF / esp_codec_dev / esp_ghota
+#   - Lero Voice OTA Service → LERO_OTA_HTTP_META_URL（改为实际 Releases 直链）
 
 # 4. 编译烧录
 idf.py build
 idf.py -p COM3 flash monitor
 ```
+
+**开发工具**：仓库附带 `.vscode/` 共享配置（推荐扩展、目标芯片、构建/烧录任务）
+与 `.devcontainer/`（ESP-IDF 开发容器，一键 Reopen in Container）。
 
 **推荐参考板**（与 Lero 高度同源，可直接抄作业）：
 

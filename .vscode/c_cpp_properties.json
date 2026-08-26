@@ -1,0 +1,21 @@
+{
+  "configurations": [
+    {
+      "name": "ESP-IDF (esp32s31)",
+      "includePath": [
+        "${workspaceFolder}/components/**",
+        "${workspaceFolder}/main/**",
+        "${env:IDF_PATH}/components/**",
+        "${workspaceFolder}/build/config",
+        "${workspaceFolder}/build"
+      ],
+      "defines": [
+        "CONFIG_IDF_TARGET_ESP32S31"
+      ],
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "linux-gcc-x64"
+    }
+  ],
+  "version": 4
+}

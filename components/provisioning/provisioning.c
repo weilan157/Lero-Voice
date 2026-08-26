@@ -269,9 +269,9 @@ static void s_wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, v
         }
         /* IDLE / DONE：已配置网络的运行期掉线 → 安排自动重连（指数退避） */
         if (s_configured && (s_next_reconnect_us == 0)) {
-            ESP_LOGW(TAG, "connection lost, reconnect in %lu ms",
-                     (unsigned long)s_reconnect_delay());
-            s_next_reconnect_us = esp_timer_get_time() + (int64_t)s_reconnect_delay() * 1000;
+            const uint32_t delay_ms = s_reconnect_delay();
+            ESP_LOGW(TAG, "connection lost, reconnect in %lu ms", (unsigned long)delay_ms);
+            s_next_reconnect_us = esp_timer_get_time() + (int64_t)delay_ms * 1000;
         }
     }
 }
@@ -414,6 +414,7 @@ esp_err_t prov_enter_smartconfig(void)
     s_probe_retries = 0U;
     s_pending_probe = false;
     s_next_probe_us = 0;
+    s_next_reconnect_us = 0;        /* 配网期间暂停重连调度 */
 
     err = prov_smartconfig_start();
     if (err == ESP_OK) {

@@ -1,0 +1,15 @@
+{
+  // Lero Voice shared VS Code settings
+  // 前提：终端已 export ESP-IDF（或扩展设置中指定 espIdfPath）
+  "idf.target": "esp32s31",
+  "idf.espIdfPath": "${env:IDF_PATH}",
+  "idf.flashType": "UART",
+  "idf.adapterTargetName": "esp32s31",
+  "files.associations": {
+    "*.h": "c"
+  },
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "C_Cpp.default.cStandard": "c11",
+  "C_Cpp.default.cppStandard": "c++17"
+}

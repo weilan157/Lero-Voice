@@ -1,0 +1,41 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "idf: build",
+      "type": "shell",
+      "command": "idf.py build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "idf: flash & monitor",
+      "type": "shell",
+      "command": "idf.py -p ${input:serialPort} flash monitor",
+      "problemMatcher": []
+    },
+    {
+      "label": "idf: menuconfig",
+      "type": "shell",
+      "command": "idf.py menuconfig",
+      "problemMatcher": []
+    },
+    {
+      "label": "idf: erase flash",
+      "type": "shell",
+      "command": "idf.py erase-flash",
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "serialPort",
+      "type": "promptString",
+      "description": "串口（Windows: COM3；Linux/macOS: /dev/ttyUSB0）",
+      "default": "COM3"
+    }
+  ]
+}
