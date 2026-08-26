@@ -65,9 +65,14 @@ idf.py menuconfig
 #   - Lero Voice Provisioning → LERO_PROV_PROBE_URL（按网络环境）
 ```
 
-**组件依赖自动拉取**：`idf.py build` 首次执行时按根目录 `idf_component.yml` 自动下载
-`esp_codec_dev`（ES8389 驱动）与 `esp_audio_simple_player`（ESP-GMF 播放器）到
-`managed_components/`（该目录已 gitignore，可随时删除重建：`idf.py reconfigure`）。
+**组件依赖拉取（v6.1 起为显式操作）**：依赖清单在 `main/idf_component.yml`
+（**v6.1 起必须放在组件目录内，根目录 manifest 不再被处理**），构建前执行：
+
+```bash
+idf.py update-dependencies    # 拉取到 managed_components/（该目录已 gitignore）
+```
+
+依赖包括 `esp_codec_dev`（ES8389 驱动）与 `esp_audio_simple_player`（ESP-GMF 播放器）。
 
 ## 4. 构建 / 烧录 / 监控
 

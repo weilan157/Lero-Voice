@@ -231,6 +231,7 @@
 ```
 Lero-Voice/                    # 仓库根 = ESP-IDF 工程（target: esp32s31）
 ├── main/                      # 主入口（main.c：nvs → bsp_init → diag/prov/ota → 静态任务）
+│   └── idf_component.yml      # 组件依赖清单（v6.1 起放组件目录；update-dependencies 拉取）
 ├── components/                # 组件（各自独立、可测试）
 │   ├── bsp/                   # ★ BSP：唯一接触硬件外设的层（见 3.3）
 │   │   ├── bsp_config.h       # 唯一板级适配点：引脚映射 / 外设参数 / 缓冲区大小

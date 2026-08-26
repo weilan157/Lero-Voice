@@ -1,5 +1,7 @@
 ## Lero Voice managed component dependencies
 ## (docs/PLAN.md 3.1 / 6.2: ESP-GMF audio via esp_audio_simple_player)
+## NOTE: IDF v6.1 起 manifest 需放在组件目录（main/）内，且依赖不再随
+## cmake 自动拉取 —— 构建前执行 `idf.py update-dependencies`。
 dependencies:
   espressif/esp_codec_dev: "^1.6.2"            # ES8389 官方驱动（播放+录音）
   espressif/esp_audio_simple_player: "^1.0.0~2" # ESP-GMF 播放器（MP3/WAV/FLAC/AAC...）
