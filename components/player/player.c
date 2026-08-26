@@ -248,7 +248,7 @@ esp_err_t player_set_volume(uint8_t pct)
     if (s_codec == NULL) {
         return ESP_ERR_NOT_FOUND;
     }
-    if (esp_codec_dev_set_out_vol(s_codec, (float)pct) != ESP_CODEC_DEV_OK) {
+    if (esp_codec_dev_set_out_vol(s_codec, (int)pct) != ESP_CODEC_DEV_OK) {
         return ESP_FAIL;
     }
     return ESP_OK;

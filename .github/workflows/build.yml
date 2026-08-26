@@ -45,7 +45,10 @@ jobs:
           command: |
             python -m pip install -U --quiet idf-component-manager
             idf.py update-dependencies
-            ls managed_components 2>/dev/null || echo "WARN: managed_components not created"
+            ls managed_components
+            for f in $(find managed_components -name "es8389_codec.h" -o -name "esp_codec_dev_defaults.h" -o -name "esp_codec_dev_types.h" -o -name "esp_codec_dev.h"); do
+              echo "===== $f ====="; head -c 20000 "$f"
+            done
             idf.py build
           # 注意：extra_docker_args 必须为单行（action 将其嵌入多行 docker
           # 命令；用 YAML 折叠标量 >- 合并换行为空格，禁止用 | 保留换行）

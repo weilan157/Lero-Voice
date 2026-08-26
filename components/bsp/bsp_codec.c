@@ -119,16 +119,18 @@ esp_err_t bsp_codec_init(void)
         return err;
     }
 
-    /* 3. 控制接口：I2C0 总线（bsp_config 中 I2C0 即 codec/IMU 总线） */
+    /* 3. 控制接口：I2C0 总线（bsp_config 中 I2C0 即 codec/IMU 总线）。
+     *    注：esp_codec_dev 2.x 的 audio_codec_i2c_cfg_t 无 port 成员
+     *    （bus_handle 方式已足够），勿加 .port。 */
     i2c_master_bus_handle_t bus = NULL;
     err = bsp_i2c_get_bus0(&bus);
     if (err != ESP_OK) {
         return err;
     }
     audio_codec_i2c_cfg_t i2c_cfg = {
-        .port = I2C_NUM_0,
         .addr = BSP_ES8389_I2C_ADDR,
         .bus_handle = bus,
+        .clock_speed_hz = (int)BSP_I2C0_FREQ_HZ,
     };
     const audio_codec_ctrl_if_t *ctrl_if = audio_codec_new_i2c_ctrl(&i2c_cfg);
     if (ctrl_if == NULL) {
@@ -196,7 +198,7 @@ esp_err_t bsp_codec_set_volume(uint8_t volume_pct)
     if (volume_pct > 100U) {
         return ESP_ERR_INVALID_ARG;
     }
-    if (esp_codec_dev_set_out_vol(s_codec_dev, (float)volume_pct) != ESP_CODEC_DEV_OK) {
+    if (esp_codec_dev_set_out_vol(s_codec_dev, (int)volume_pct) != ESP_CODEC_DEV_OK) {
         return ESP_FAIL;
     }
     return ESP_OK;

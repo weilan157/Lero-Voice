@@ -134,7 +134,7 @@ esp_err_t bsp_display_init(void)
         },
         .data_width = 18,
         .in_color_format = LCD_COLOR_FMT_RGB888,
-        .out_color_format = LCD_COLOR_FMT_RGB666,   /* 18-bit 并口对应 RGB666 */
+        .out_color_format = LCD_COLOR_FMT_RGB888,   /* 18-bit 并口：驱动内部降位输出 */
         .num_fbs = 2,
         .user_fbs = { s_fb0, s_fb1 },
         .bounce_buffer_size_px = 0,
