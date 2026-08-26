@@ -1062,11 +1062,11 @@ jobs:
           SIZE=$(stat -c%s build/Lero-Voice.bin)
           test "$SIZE" -le 3984588 || { echo "app too large for OTA slot (limit 3.8 MB)"; exit 1; }
       - name: Generate OTA metadata (meta.json)
+        # build/ 为容器 root 生成，host 不可写；校验产物写到仓库根
         run: |
-          cd build
-          sha256sum Lero-Voice.bin | awk '{print $1}' > app.sha256
-          PT_SHA=$(sha256sum ../partitions.csv | awk '{print $1}')
-          SIZE=$(stat -c%s Lero-Voice.bin)
+          sha256sum build/Lero-Voice.bin | awk '{print $1}' > app.sha256
+          PT_SHA=$(sha256sum partitions.csv | awk '{print $1}')
+          SIZE=$(stat -c%s build/Lero-Voice.bin)
           jq -n --arg v "$GITHUB_REF_NAME" \
                  --arg s "$(cat app.sha256)" \
                  --arg p "$PT_SHA" \
@@ -1081,8 +1081,8 @@ jobs:
         with:
           files: |
             build/Lero-Voice.bin
-            build/app.sha256
-            build/meta.json
+            app.sha256
+            meta.json
 ```
 
 ### 8.11 第二轮审查：已识别风险与待完善项（v3.2）
