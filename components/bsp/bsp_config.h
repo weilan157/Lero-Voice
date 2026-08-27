@@ -93,7 +93,15 @@ extern "C" {
 #define BSP_USB_EN_GPIO             GPIO_NUM_53
 
 /* ---------------- I2C device addresses (PLAN 2.4.1 / 2.6 #7) ------------ */
-#define BSP_ES8389_I2C_ADDR         0x20U
+/* 地址语义（2026-08-28 上板实测修正）：
+ * - BSP_ES8389_I2C_ADDR = 0x20 是 **8-bit 写地址**，与官方驱动
+ *   ES8389_CODEC_DEFAULT_ADDR 一致；esp_codec_dev 的 ctrl 层内部
+ *   >>1 得 7-bit 0x10（audio_codec_ctrl_i2c.c），因此传给
+ *   esp_codec_dev 的 .addr 保持 0x20。
+ * - i2c_master 总线（bsp_i2c_add_device0 / diag i2c-scan / reg）使用
+ *   **7-bit 地址 0x10**（i2c-scan 实测芯片在 7-bit 0x10 = 8-bit 0x20）。 */
+#define BSP_ES8389_I2C_ADDR         0x20U   /* 8-bit 写地址（esp_codec_dev 用） */
+#define BSP_ES8389_I2C_ADDR_7BIT    0x10U   /* 7-bit 地址（i2c_master 总线用） */
 #define BSP_QMI8658_ADDR_A          0x6AU
 #define BSP_QMI8658_ADDR_B          0x68U
 

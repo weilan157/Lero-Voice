@@ -453,7 +453,7 @@ static int cmd_codec(int argc, char **argv)
     (void)argc;
     (void)argv;
     if (!bsp_codec_is_present()) {
-        printf("codec: not found (AUD_3V3 / 0x20 / I2C0)\n");
+        printf("codec: not found (AUD_3V3 / 7-bit addr 0x10 / I2C0)\n");
         return 0;
     }
     printf("ES8389 registers:\n");

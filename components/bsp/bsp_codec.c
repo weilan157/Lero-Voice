@@ -6,7 +6,7 @@
 
 /**
  * @file bsp_codec.c
- * @brief ES8389 audio codec (I2C0, addr 0x20) + I2S playback path.
+ * @brief ES8389 audio codec (I2C0, 8-bit addr 0x20 = 7-bit 0x10) + I2S path.
  *
  * Driver: espressif/esp_codec_dev (>= v1.3.6, official ES8389 support).
  *   I2S (master, pins from bsp_config.h) -> audio_codec_data_if
@@ -14,9 +14,10 @@
  *   es8389_codec_new()                     -> audio_codec_if
  *   esp_codec_dev_new()                    -> playback/record handle
  *
- * NOTE: MCLK is generated on BSP_I2S_MCLK_GPIO (IO36). The current schematic
- * does not route MCLK to the codec (docs/PLAN.md 2.6 #1); the audio path
- * works once the schematic revision + new PCB are in place.
+ * NOTE: no external MCLK on this board — BCLK PIN mode (no_mclk=true):
+ * the codec derives its clock from the I2S BCLK (docs/PLAN.md 2.6 #1),
+ * REG0x02[7:6]=01. The schematic shorts pin4(MCLK/TDMIN) with DACDAT,
+ * which is harmless in BCLK mode.
  *
  * NOTE: 针对 esp_codec_dev 2.x（本工程经 gmf 链解析到 2.0.0-beta3）：
  * es8389_codec_cfg_t 由 v1 的平铺字段改为 audio_hw_*_cfg_t 子配置
@@ -123,9 +124,11 @@ esp_err_t bsp_codec_init(void)
         return ESP_OK;
     }
 
-    /* 1. I2C 探测：确认 ES8389 在线（寄存器 0 可读） */
+    /* 1. I2C 探测：确认 ES8389 在线（寄存器 0 可读）。
+     *    注意：i2c_master 总线用 7-bit 地址 0x10（= 8-bit 写地址 0x20，
+     *    后者仅供 esp_codec_dev 内部 >>1 使用；见 bsp_config.h 注释） */
     i2c_master_dev_handle_t probe = NULL;
-    esp_err_t err = bsp_i2c_add_device0(BSP_ES8389_I2C_ADDR, BSP_I2C0_FREQ_HZ, &probe);
+    esp_err_t err = bsp_i2c_add_device0(BSP_ES8389_I2C_ADDR_7BIT, BSP_I2C0_FREQ_HZ, &probe);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "add device failed: %s", esp_err_to_name(err));
         return err;
@@ -134,13 +137,13 @@ esp_err_t bsp_codec_init(void)
     uint8_t val = 0U;
     err = i2c_master_transmit_receive(probe, &reg, 1U, &val, 1U, 100);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "codec 0x20 no ACK (%s); 排查 AUD_3V3 供电 / 地址 0x20 / I2C0 上拉",
+        ESP_LOGW(TAG, "codec 7-bit 0x10 no ACK (%s); 排查 AUD_3V3 供电 / 地址 / I2C0 上拉",
                  esp_err_to_name(err));
         return err;
     }
     s_present = true;
     s_probe = probe;
-    ESP_LOGI(TAG, "ES8389 present at 0x20 (reg0=0x%02X)", (unsigned)val);
+    ESP_LOGI(TAG, "ES8389 present at 7-bit 0x10 (8-bit 0x20, reg0=0x%02X)", (unsigned)val);
 
     /* 2. I2S 通道（主模式，引脚见 bsp_config.h） */
     err = s_i2s_init();
@@ -222,7 +225,7 @@ esp_err_t bsp_codec_init(void)
         return ESP_FAIL;
     }
 
-    ESP_LOGI(TAG, "codec ready (esp_codec_dev, 0x20)");
+    ESP_LOGI(TAG, "codec ready (esp_codec_dev, 8-bit addr 0x20 = 7-bit 0x10)");
     return ESP_OK;
 }
 

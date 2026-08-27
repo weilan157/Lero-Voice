@@ -70,7 +70,7 @@ play audio/test.mp3 / rec / vol 80
 ```
 | 现象 | 排查步骤 |
 |------|----------|
-| 启动日志 `codec 0x20 no ACK` | ① AUD_3V3 供电（万用表）→ ② 0x20 地址核对 → ③ `i2c-scan` 查 I2C0 总线与上拉 |
+| 启动日志 `codec 7-bit 0x10 no ACK` | ① AUD_3V3 供电（万用表）→ ② 地址语义核对：**i2c_master 总线用 7-bit 0x10**（= 8-bit 写地址 0x20，仅供 esp_codec_dev 内部 >>1）→ ③ `i2c-scan` 查 I2C0 总线与上拉（应见 0x10） |
 | 有 ACK 但无声 | ① `codec` 查时钟源位 ② `log bsp_codec debug`（驱动打印 Clock source）③ 示波器量 IO3/4/5/6（SCLK/LRCK/SDOUT/DSDIN）④ `vol` 与功放（`periph` 查 PA=IO52） |
 | 播放报错 | `player` 状态、`sd` 卡与文件路径、文件格式（mp3/wav/flac…） |
 

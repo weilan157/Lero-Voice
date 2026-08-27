@@ -82,7 +82,7 @@
   │  ESP32-S31-WROOM-3-N16R16V                                    │
   │                                                                │
   │  I2S(SCLK/LRCK/SDOUT/DSDIN) ──► ES8389 ──► NS4150B ×2 ──► 喇叭 L/R │
-  │  I2C0(SDA=IO0/SCL=IO1) ──► ES8389(0x20) / QMI8658A(0x6A)        │
+  │  I2C0(SDA=IO0/SCL=IO1) ──► ES8389(7-bit 0x10 = 8-bit 0x20) / QMI8658A(0x6A) │
   │  I2C1(SDA=IO46/SCL=IO47) ──► 触摸屏(TP_INT=IO2)               │
   │  RGB18(DB0~17=IO7~19/35~39, DE/PCLK/HS/VS/RESET) ──► LCD │
   │  SDIO(4-bit) + SD_DET ──► MicroSD                              │
@@ -389,7 +389,7 @@
 
 | 外设 | 驱动方案（参考官方） | 引脚 / 总线 | 关键参数 | 调试入口 |
 |------|---------------------|-------------|----------|----------|
-| **ES8389 音频** | `esp_codec_dev` 2.x（espressif/esp-audio-dev 官方 es8389.c） | I2C0（IO0/IO1，0x20）；I2S：SCLK=IO3、LRCK=IO4、SDOUT=IO5、DSDIN=IO6；**无 MCLK（BCLK PIN 模式）** | 48k/16bit/2ch；PA=IO52（bsp_amplifier） | console `codec`（寄存器 dump）、`periph` |
+| **ES8389 音频** | `esp_codec_dev` 2.x（espressif/esp-audio-dev 官方 es8389.c） | I2C0（IO0/IO1，**8-bit 0x20 = 7-bit 0x10**，i2c_master 总线用 7-bit 0x10）；I2S：SCLK=IO3、LRCK=IO4、SDOUT=IO5、DSDIN=IO6；**无 MCLK（BCLK PIN 模式）** | 48k/16bit/2ch；PA=IO52（bsp_amplifier） | console `codec`（寄存器 dump）、`periph` |
 | **QMI8658A IMU** | 自研轮询驱动（寄存器映射按 QMI8658A 手册，参考 esp-bsp 风格） | I2C0（0x6A/0x68 双地址探测） | accel ±4g/1kHz、gyro ±2048dps/1kHz | console `imu` |
 | **FT6336U 触摸** | `esp_lcd_touch_ft5x06` + `esp_lcd_touch`（esp-bsp 官方） | I2C1（IO46/IO47，0x38）；INT=IO2（下降沿）、RST=IO48（低有效） | 400 kHz；720×720 坐标 | console `touch` |
 | **RGB LCD** | `esp_lcd` RGB 面板（esp-idf 官方，16-bit RGB565） | DB0~12=IO7~19、DB13~17=IO35~39、PCLK=IO40、DE=IO42、RESET=IO43、HS=IO44、VS=IO45、BL=IO54 | 720×720、PCLK 31 MHz、消隐 1/79/20、1/24/5；NV3052C（OTP，无 SPI 初始化） | `periph` + LVGL benchmark FPS |
@@ -425,6 +425,7 @@
 | 6 | ⚠️ **IMU 中断未接主控**：QMI8658A 的 INT1/INT2 引脚无网络（仅 SDA/SCL/3V3/GND） | IMU 只能轮询读取，无法中断唤醒 / 手势中断；**BSP 轮询驱动已实现**（2026-08-27：accel ±4g / gyro ±2048dps / 1 kHz，console `imu` 命令验证；手势唤醒需改版补连） |
 | 7 | ⚠️ **IMU 地址脚 SA0 悬空**：SDO/SA0 未接，地址依赖内部默认（原理图标注 0x6A） | **已实现**：初始化先探测 0x6A / 0x68 再锁定（bsp_imu.c） |
 | 8 | ⚠️ **ADC 通道映射与衰减（上板实测确认）**：GPIO50/51 属 **ADC2**（CH0/CH1；ADC1 仅 GPIO42~49）；S31 为新一代 SAR ADC（17-bit、差分），`SOC_ADC_ATTEN_NUM=1` 仅 `ADC_ATTEN_DB_0` 合法（`DB_11` 编译期不存在、`DB_12` 运行时报 invalid attenuation，官方 oneshot 示例同此处理） | 已按 ADC2 + DB_0 修正；ADC2 与 Wi-Fi 活跃时的共存性需上板实测（若读数异常改用 ADC1 引脚或连续采样） |
+| 9 | ✅ **ES8389 I2C 地址语义（上板实测 2026-08-28）**：原理图标注 0x20 是 **8-bit 写地址**（与官方驱动 `ES8389_CODEC_DEFAULT_ADDR` 一致），芯片实际挂在 **7-bit 0x10**；esp_codec_dev ctrl 层内部 `>>1`（audio_codec_ctrl_i2c.c）用 0x20 正确，但 BSP 自写探测曾把 0x20 直接当 7-bit 用导致 no-ACK | **已修复**：bsp_config.h 区分 `BSP_ES8389_I2C_ADDR`（8-bit 0x20，esp_codec_dev 用）与 `BSP_ES8389_I2C_ADDR_7BIT`（7-bit 0x10，i2c_master 总线/探测/i2c-scan 用）；`i2c-scan` 实测芯片在 0x10 |
 
 ---
 
