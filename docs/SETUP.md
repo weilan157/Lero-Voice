@@ -12,26 +12,28 @@
 | 操作系统 | Windows 10/11 · macOS 12+ · Ubuntu 20.04/22.04 | 任一即可 |
 | Git | ≥ 2.30 | 克隆 ESP-IDF 与本项目 |
 | Python | 3.10+（由 ESP-IDF 安装脚本自动管理） | 无需单独安装 |
-| **ESP-IDF** | **v6.1+**（esp32s31 支持的最低版本线；**v6.0 全系无 S31 工具链**） | CMake/Ninja/工具链由 `install.sh` 自动安装 |
+| **ESP-IDF** | **v6.2+**（esp32s31 支持的最低版本线；**v6.0 全系无 S31 工具链**） | CMake/Ninja/工具链由 `install.sh` 自动安装 |
 | 串口驱动 | CP210x / CH340（按调试器芯片安装） | Windows 下需手动安装 |
 | 组件依赖 | 由 `idf_component.yml` 自动拉取（见下） | 无需手动下载 |
 
 > 固件源码位于**仓库根**（仓库根即 ESP-IDF 工程），没有嵌套目录。
 
-## 2. 安装 ESP-IDF（v6.1+，esp32s31 最低要求）
+## 2. 安装 ESP-IDF（v6.2+，esp32s31 最低要求）
 
-> ⚠️ **不要用 v6.0**：esp32s31 支持未合入 v6.0 分支（无 `toolchain-esp32s31.cmake`），
-> 最低版本线是 **v6.1**（当前 master / release/v6.1）。
+> ⚠️ **不要用 v6.0**：esp32s31 支持未合入 v6.0 分支（无 `toolchain-esp32s31.cmake`）。
+> 最低版本线是 **v6.2**（当前 master / release/v6.2）：v6.1 虽含 S31 工具链，但
+> DMA2D 芯片（esp32s31）在 IDF<6.2 时无法编译 esp_lvgl_adapter（其源码 include
+> 未声明依赖的 `esp_async_fbcpy.h`，见 3.8 CI 说明）。
 
 ### Windows
 
 ```bat
 :: 方式一：官方安装器（推荐新手）
-:: 下载 esp-idf-tools-setup 并选择 v6.1+（或 master）与 esp32s31 目标
-:: 方式二：Git Bash 手动安装（先切到 v6.1 分支）
+:: 下载 esp-idf-tools-setup 并选择 v6.2+（或 master）与 esp32s31 目标
+:: 方式二：Git Bash 手动安装（先切到 v6.2 分支）
 git clone --recursive https://github.com/espressif/esp-idf.git
 cd esp-idf
-git checkout release/v6.1
+git checkout release/v6.2
 ./install.ps1 esp32s31
 ./export.ps1
 ```
@@ -133,7 +135,7 @@ idf.py -p /dev/ttyUSB0 flash monitor   # Linux/macOS 端口示例
 
 | 组成 | 说明 |
 |------|------|
-| **编译容器** | `espressif/esp-idf-ci-action@v1` 是官方 **`espressif/idf` Docker 镜像**的封装（`esp_idf_version` 参数 = Docker Hub tag）。**使用 `release-v6.1`**（v6.1 分支，首个含 **esp32s31** 工具链的版本线）——**v6.0 / release-v6.0 全系不含 S31 工具链** |
+| **编译容器** | `espressif/esp-idf-ci-action@v1` 是官方 **`espressif/idf` Docker 镜像**的封装（`esp_idf_version` 参数 = Docker Hub tag）。**使用 `release-v6.2`**（v6.2 分支：含 **esp32s31** 工具链，且 DMA2D 芯片可完整编译 esp_lvgl_adapter——IDF<6.2 时 adapter 会 include 未声明依赖的 `esp_async_fbcpy.h`，编译失败）——**v6.0 / release-v6.0 全系不含 S31 工具链** |
 | **首次拉取** | 镜像约 4.3 GB，首次较慢；GitHub 自动缓存容器层，同 tag 后续秒级 |
 | **增量编译** | 挂载 `.ccache` 卷 + `IDF_CCACHE_ENABLE=1`，由 `actions/cache` 跨运行持久化（首次全量，之后增量） |
 | **组件拉取** | **IDF v6.1 起组件管理器不再随 CMake 自动执行**（v6.0 的 `component_manager.cmake` 已移除）——CI 显式执行 `idf.py update-dependencies` 拉取 `managed_components/`（顺带升级 `idf-component-manager` pip 包匹配接口版本）；本地同理 |
@@ -142,7 +144,7 @@ idf.py -p /dev/ttyUSB0 flash monitor   # Linux/macOS 端口示例
 **本地复现 CI 编译**（与 CI 完全一致的环境）：
 
 ```bash
-docker run --rm -v "$(pwd):/workspace" -w /workspace espressif/idf:release-v6.1 \
+docker run --rm -v "$(pwd):/workspace" -w /workspace espressif/idf:release-v6.2 \
   bash -c ". \$IDF_PATH/export.sh && idf.py set-target esp32s31 && idf.py build"
 ```
 
@@ -150,7 +152,7 @@ docker run --rm -v "$(pwd):/workspace" -w /workspace espressif/idf:release-v6.1 
 
 | 问题 | 处理 |
 |------|------|
-| CI 报 `image not found` / tag 无效 | `esp_idf_version` 必须是 [Docker Hub 已发布的 tag](https://hub.docker.com/r/espressif/idf/tags)（如 `release-v6.1`、`v6.1-rc1`） |
+| CI 报 `image not found` / tag 无效 | `esp_idf_version` 必须是 [Docker Hub 已发布的 tag](https://hub.docker.com/r/espressif/idf/tags)（如 `release-v6.2`、`v6.1-rc1`） |
 | 报 `toolchain-esp32s31.cmake not found` | 镜像版本不含 S31 工具链 —— **必须用 v6.1 及以上的 tag**（v6.0 全系均缺） |
 | 拉镜像超时 | GitHub 托管 runner 直连 Docker Hub 一般正常；自托管 runner 需配置镜像加速 |
 | 首次构建慢 | 属正常（镜像层 + 全量编译）；第二次起有 ccache 增量 |

@@ -21,7 +21,7 @@ jobs:
       # ---- 编译环境说明（docs/SETUP.md "CI 编译环境"）----
       # espressif/esp-idf-ci-action 是官方 espressif/idf Docker 镜像的封装：
       #   - esp_idf_version 必须是 Docker Hub tag（v6.0 = espressif/idf:v6.0，
-      #     内含全部目标工具链，含 esp32s31；IDF v6.0 为 S31 支持版本）
+      #     内含全部目标工具链，含 esp32s31）
       #   - 镜像约 4.3GB：首次拉取较慢，GitHub 会自动缓存容器层，后续秒级
       #   - 通过挂载 .ccache 卷 + IDF_CCACHE_ENABLE 实现增量编译缓存，
       #     由 actions/cache 跨运行持久化（首次全量，之后增量）
@@ -37,10 +37,12 @@ jobs:
 
       - uses: espressif/esp-idf-ci-action@v1
         with:
-          # esp32s31 支持的最低版本线是 v6.1（v6.0 全系缺
-          # toolchain-esp32s31.cmake，CI 会报 toolchain not found）。
-          # release-v6.1 = v6.1 分支跟踪镜像（Docker Hub 已发布）。
-          esp_idf_version: release-v6.1
+          # esp32s31 支持的最低版本线是 v6.1；DMA2D 芯片（esp32s31/esp32p4）
+          # 需 v6.2+：esp_lvgl_adapter 0.5.x 在 IDF<6.2 时 include 独立的
+          # esp_async_fbcpy.h 但未声明组件依赖（编译报头文件缺失），
+          # IDF 6.2+ 改用内置 esp_driver_dma 的 esp_async_color_convert.h。
+          # release-v6.2 = v6.2 分支跟踪镜像（Docker Hub 已发布）。
+          esp_idf_version: release-v6.2
           target: esp32s31
           path: '.'
           # 组件依赖：IDF v6.1 起组件管理器不再随 cmake 自动执行
@@ -79,7 +81,7 @@ jobs:
             '{version:$v, min_app_version:"v1.0.0", target:"esp32s31-wroom-3",
               soc:"esp32s31", flash_size:16777216, psram:true,
               app_bin:"Lero-Voice.bin", app_bin_size:$n, app_sha256:$s,
-              partition_table_sha256:$p, idf_version:"v6.1.0",
+              partition_table_sha256:$p, idf_version:"v6.2.0",
               build_date:(now|todateiso8601), release_notes:"", signature:""}' > meta.json
 
       - name: Create Release (tag only)
