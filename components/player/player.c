@@ -154,9 +154,14 @@ static int s_event(esp_asp_event_pkt_t *event, void *ctx)
             break;
         case ESP_ASP_STATE_FINISHED:
             if (s_loop && (s_loop_uri[0] != '\0')) {
-                /* 循环模式：自动重播同一 URI（codec 保持打开） */
-                ESP_LOGI(TAG, "loop: replaying %s", s_loop_uri);
-                if (esp_audio_simple_player_run(s_player, s_loop_uri, NULL) != ESP_GMF_ERR_OK) {
+                /* 循环模式：完整重开而不是复用旧 codec —— I2S 停止→重启的
+                 * 时钟间隙会让 BCLK PIN 模式的 ES8389 失锁（噪声随机），
+                 * 每次重播都走 set_fmt + set_fs + enable 全新初始化 */
+                char uri[PLAYER_URI_MAX];
+                (void)strlcpy(uri, s_loop_uri, sizeof(uri));
+                ESP_LOGI(TAG, "loop: replaying %s", uri);
+                s_finish(PLAYER_STATE_IDLE);
+                if (s_play_uri(uri, true) != ESP_OK) {
                     ESP_LOGE(TAG, "loop replay failed");
                     s_finish(PLAYER_STATE_ERROR);
                 }
