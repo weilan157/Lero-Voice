@@ -39,10 +39,12 @@ jobs:
         with:
           # esp32s31 支持的最低版本线是 v6.1；DMA2D 芯片（esp32s31/esp32p4）
           # 需 v6.2+：esp_lvgl_adapter 0.5.x 在 IDF<6.2 时 include 独立的
-          # esp_async_fbcpy.h 但未声明组件依赖（编译报头文件缺失），
+          # esp_async_fbcpy.h 但未声明组件依赖（编译报头文件缺失，
+          # esp32.com 论坛已确认官方 factory_demo 同问题），
           # IDF 6.2+ 改用内置 esp_driver_dma 的 esp_async_color_convert.h。
-          # release-v6.2 = v6.2 分支跟踪镜像（Docker Hub 已发布）。
-          esp_idf_version: release-v6.2
+          # 注意：Docker Hub 无 release-v6.2 tag（分支跟踪镜像未建），
+          # 用正式发布 tag v6.2。
+          esp_idf_version: v6.2
           target: esp32s31
           path: '.'
           # 组件依赖：IDF v6.1 起组件管理器不再随 cmake 自动执行

@@ -1296,7 +1296,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: release-v6.2  # v6.2 分支镜像（S31 工具链 + esp_lvgl_adapter DMA2D 支持；v6.0 全系不含）
+          esp_idf_version: v6.2  # 正式发布 tag（S31 工具链 + esp_lvgl_adapter DMA2D 支持；v6.0 全系不含；无 release-v6.2 tag）
           target: esp32s31
           path: '.'
           # 容器内执行：升级组件管理器 + 显式拉取依赖（v6.1 起不再随 cmake 自动执行）+ 构建

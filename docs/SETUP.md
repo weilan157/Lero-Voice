@@ -135,7 +135,7 @@ idf.py -p /dev/ttyUSB0 flash monitor   # Linux/macOS 端口示例
 
 | 组成 | 说明 |
 |------|------|
-| **编译容器** | `espressif/esp-idf-ci-action@v1` 是官方 **`espressif/idf` Docker 镜像**的封装（`esp_idf_version` 参数 = Docker Hub tag）。**使用 `release-v6.2`**（v6.2 分支：含 **esp32s31** 工具链，且 DMA2D 芯片可完整编译 esp_lvgl_adapter——IDF<6.2 时 adapter 会 include 未声明依赖的 `esp_async_fbcpy.h`，编译失败）——**v6.0 / release-v6.0 全系不含 S31 工具链** |
+| **编译容器** | `espressif/esp-idf-ci-action@v1` 是官方 **`espressif/idf` Docker 镜像**的封装（`esp_idf_version` 参数 = Docker Hub tag）。**使用 `v6.2`**（正式发布版 tag；含 **esp32s31** 工具链，且 DMA2D 芯片可完整编译 esp_lvgl_adapter——IDF<6.2 时 adapter 会 include 未声明依赖的 `esp_async_fbcpy.h`，编译失败；Docker Hub 无 `release-v6.2` 分支跟踪 tag）——**v6.0 / release-v6.0 全系不含 S31 工具链** |
 | **首次拉取** | 镜像约 4.3 GB，首次较慢；GitHub 自动缓存容器层，同 tag 后续秒级 |
 | **增量编译** | 挂载 `.ccache` 卷 + `IDF_CCACHE_ENABLE=1`，由 `actions/cache` 跨运行持久化（首次全量，之后增量） |
 | **组件拉取** | **IDF v6.1 起组件管理器不再随 CMake 自动执行**（v6.0 的 `component_manager.cmake` 已移除）——CI 显式执行 `idf.py update-dependencies` 拉取 `managed_components/`（顺带升级 `idf-component-manager` pip 包匹配接口版本）；本地同理 |
@@ -144,7 +144,7 @@ idf.py -p /dev/ttyUSB0 flash monitor   # Linux/macOS 端口示例
 **本地复现 CI 编译**（与 CI 完全一致的环境）：
 
 ```bash
-docker run --rm -v "$(pwd):/workspace" -w /workspace espressif/idf:release-v6.2 \
+docker run --rm -v "$(pwd):/workspace" -w /workspace espressif/idf:v6.2 \
   bash -c ". \$IDF_PATH/export.sh && idf.py set-target esp32s31 && idf.py build"
 ```
 
@@ -152,7 +152,7 @@ docker run --rm -v "$(pwd):/workspace" -w /workspace espressif/idf:release-v6.2 
 
 | 问题 | 处理 |
 |------|------|
-| CI 报 `image not found` / tag 无效 | `esp_idf_version` 必须是 [Docker Hub 已发布的 tag](https://hub.docker.com/r/espressif/idf/tags)（如 `release-v6.2`、`v6.1-rc1`） |
+| CI 报 `image not found` / tag 无效 | `esp_idf_version` 必须是 [Docker Hub 已发布的 tag](https://hub.docker.com/r/espressif/idf/tags)（如 `v6.2`、`v6.1-rc1`） |
 | 报 `toolchain-esp32s31.cmake not found` | 镜像版本不含 S31 工具链 —— **必须用 v6.1 及以上的 tag**（v6.0 全系均缺） |
 | 拉镜像超时 | GitHub 托管 runner 直连 Docker Hub 一般正常；自托管 runner 需配置镜像加速 |
 | 首次构建慢 | 属正常（镜像层 + 全量编译）；第二次起有 ccache 增量 |
