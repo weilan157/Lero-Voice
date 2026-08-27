@@ -267,6 +267,55 @@ static int cmd_play(int argc, char **argv)
     return 0;
 }
 
+static int cmd_play_loop(int argc, char **argv)
+{
+    if (argc != 2) {
+        printf("usage: play-loop <path>  (SD file, repeat until stop)\n");
+        return 1;
+    }
+    esp_err_t err = player_play_loop(argv[1]);
+    printf("play-loop: %s\n", (err == ESP_OK) ? "started" : esp_err_to_name(err));
+    return 0;
+}
+
+static int cmd_play_url(int argc, char **argv)
+{
+    if (argc != 2) {
+        printf("usage: play-url <http(s) url>\n");
+        printf("  download the song to SD then play it in loop\n");
+        return 1;
+    }
+    esp_err_t err = player_play_url(argv[1]);
+    printf("play-url: %s\n", (err == ESP_OK) ? "download started" : esp_err_to_name(err));
+    return 0;
+}
+
+static int cmd_rec(int argc, char **argv)
+{
+    uint32_t seconds = (uint32_t)CONFIG_LERO_VOICE_RECORD_DEFAULT_SECONDS;
+    if (argc >= 2) {
+        const int v = atoi(argv[1]);
+        if ((v < 1) || (v > 600)) {
+            printf("usage: rec [seconds 1-600]\n");
+            return 1;
+        }
+        seconds = (uint32_t)v;
+    }
+    esp_err_t err = voice_record_start(seconds, NULL);
+    printf("rec %u s: %s\n", (unsigned)seconds,
+           (err == ESP_OK) ? "recording" : esp_err_to_name(err));
+    return 0;
+}
+
+static int cmd_rec_stop(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    (void)voice_record_stop();
+    printf("rec-stop\n");
+    return 0;
+}
+
 static int cmd_stop(int argc, char **argv)
 {
     (void)argc;
@@ -414,6 +463,10 @@ esp_err_t diag_console_register(void)
         { .command = "sd",       .help = "SD card + log files",         .hint = NULL, .func = cmd_sd },
         { .command = "snapshot", .help = "latest status snapshot",      .hint = NULL, .func = cmd_snapshot },
         { .command = "play",     .help = "play <path> (SD audio file)", .hint = NULL, .func = cmd_play },
+        { .command = "play-loop",.help = "play <path> in loop until stop", .hint = NULL, .func = cmd_play_loop },
+        { .command = "play-url", .help = "download URL song to SD + loop play", .hint = NULL, .func = cmd_play_url },
+        { .command = "rec",      .help = "record N s (default 30) to WAV + auto play", .hint = NULL, .func = cmd_rec },
+        { .command = "rec-stop", .help = "stop recording early",        .hint = NULL, .func = cmd_rec_stop },
         { .command = "stop",     .help = "stop playback",               .hint = NULL, .func = cmd_stop },
         { .command = "pause",    .help = "pause playback",              .hint = NULL, .func = cmd_pause },
         { .command = "resume",   .help = "resume playback",             .hint = NULL, .func = cmd_resume },

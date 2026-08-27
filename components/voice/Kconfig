@@ -43,4 +43,13 @@ config LERO_VOICE_MIN_UTTERANCE_MS
     int "Minimum utterance length before auto stop (ms)"
     default 400
 
+config LERO_VOICE_RECORD_DEFAULT_SECONDS
+    int "Default record duration (s, console 'rec')"
+    default 30
+    range 1 600
+
+config LERO_VOICE_RECORD_DEFAULT_PATH
+    string "Default record output path (WAV on SD)"
+    default "/sdcard/record/rec.wav"
+
 endmenu

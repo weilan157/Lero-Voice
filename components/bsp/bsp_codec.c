@@ -20,8 +20,17 @@
  *
  * NOTE: 针对 esp_codec_dev 2.x（本工程经 gmf 链解析到 2.0.0-beta3）：
  * es8389_codec_cfg_t 由 v1 的平铺字段改为 audio_hw_*_cfg_t 子配置
- * （sys/adc/dac/pa），工作模式枚举已移除。子配置置 0 由驱动兜底默认，
- * 上板前按 audio_codec_hw_cfg.h 细化（use_mclk/mclk_div 等）。
+ * （sys/adc/dac/pa），工作模式枚举已移除。子配置按官方
+ * espressif/esp-audio-dev 仓库（device/include/audio_codec_hw_cfg.h）
+ * 语义填写：
+ *   - sys_cfg.is_master=false : ESP32 I2S 主模式输出 BCLK/LRCK，codec 从模式
+ *   - sys_cfg.no_mclk=false   : 使用外部 MCLK（由 I2S IO36 输出 256×fs）；
+ *                               ES8389 无内部振荡器，MCLK 缺失时模拟
+ *                               路径无声（PLAN 2.6 #1 原理图修订项）
+ *   - adc_cfg.digital_mic=false : ES8389 模拟麦克风（MIC1P/MIC1N）
+ *   - pa_cfg.pa_pin=-1       : PA（NS4150B×2）由 bsp_amplifier 控制，
+ *                              避免驱动与 BSP 双控 IO52
+ *   - hw_gain                : PA/DAC 供电与电路增益，仅影响音量 dB 标定
  */
 
 #include <string.h>
@@ -41,6 +50,7 @@
 
 static esp_codec_dev_handle_t s_codec_dev;
 static i2s_chan_handle_t s_i2s_tx;
+static i2s_chan_handle_t s_i2s_rx;
 static bool s_present;
 
 static esp_err_t s_i2s_init(void)
@@ -50,7 +60,9 @@ static esp_err_t s_i2s_init(void)
     }
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(CODEC_I2S_PORT, I2S_ROLE_MASTER);
     chan_cfg.auto_clear = true;                 /* 静音时清 DMA 残留 */
-    esp_err_t err = i2s_new_channel(&chan_cfg, &s_i2s_tx, NULL);
+    /* 播放（TX）+ 录音（RX）双通道：esp_codec_dev 的 data_if 同时持有
+     * tx/rx 句柄（audio_codec_i2s_cfg_t），录音经 esp_codec_dev_read 走 RX。 */
+    esp_err_t err = i2s_new_channel(&chan_cfg, &s_i2s_tx, &s_i2s_rx);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "i2s new channel failed: %s", esp_err_to_name(err));
         return err;
@@ -75,17 +87,28 @@ static esp_err_t s_i2s_init(void)
     std_cfg.clk_cfg.mclk_multiple = CODEC_MCLK_MULTIPLE;
     err = i2s_channel_init_std_mode(s_i2s_tx, &std_cfg);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "i2s std init failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "i2s tx std init failed: %s", esp_err_to_name(err));
+        return err;
+    }
+    err = i2s_channel_init_std_mode(s_i2s_rx, &std_cfg);    /* RX 同格式（共享时钟域） */
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "i2s rx std init failed: %s", esp_err_to_name(err));
         return err;
     }
     err = i2s_channel_enable(s_i2s_tx);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "i2s enable failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "i2s tx enable failed: %s", esp_err_to_name(err));
         return err;
     }
-    ESP_LOGI(TAG, "i2s tx ready (sclk=%d ws=%d dout=%d mclk=%d)",
+    err = i2s_channel_enable(s_i2s_rx);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "i2s rx enable failed: %s", esp_err_to_name(err));
+        return err;
+    }
+    ESP_LOGI(TAG, "i2s ready (sclk=%d ws=%d dout=%d din=%d mclk=%d)",
              (int)BSP_I2S_SCLK_GPIO, (int)BSP_I2S_LRCK_GPIO,
-             (int)BSP_I2S_DSDIN_GPIO, (int)BSP_I2S_MCLK_GPIO);
+             (int)BSP_I2S_DSDIN_GPIO, (int)BSP_I2S_SDOUT_GPIO,
+             (int)BSP_I2S_MCLK_GPIO);
     return ESP_OK;
 }
 
@@ -138,10 +161,10 @@ esp_err_t bsp_codec_init(void)
         return ESP_FAIL;
     }
 
-    /* 4. 数据接口：I2S 通道句柄 */
+    /* 4. 数据接口：I2S 通道句柄（TX 播放 + RX 录音） */
     audio_codec_i2s_cfg_t i2s_cfg = {
         .port = CODEC_I2S_PORT,
-        .rx_handle = NULL,
+        .rx_handle = s_i2s_rx,
         .tx_handle = s_i2s_tx,
     };
     const audio_codec_data_if_t *data_if = audio_codec_new_i2s_data(&i2s_cfg);
@@ -150,15 +173,29 @@ esp_err_t bsp_codec_init(void)
         return ESP_FAIL;
     }
 
-    /* 5. ES8389 codec 接口（esp_codec_dev 2.x 子配置结构；
-     *    子配置置 0 由驱动兜底，上板前按 audio_codec_hw_cfg.h 细化） */
+    /* 5. ES8389 codec 接口（esp_codec_dev 2.x 子配置结构，字段语义见
+     *    espressif/esp-audio-dev 的 audio_codec_hw_cfg.h，见文件头注释） */
     es8389_codec_cfg_t codec_cfg = {
         .ctrl_if = ctrl_if,
         .gpio_if = audio_codec_new_gpio(),
-        .sys_cfg = { 0 },
-        .adc_cfg = { 0 },
-        .dac_cfg = { 0 },
-        .pa_cfg = { 0 },
+        .sys_cfg = {
+            .is_master = false,     /* ESP32 I2S 主模式 → codec 从模式 */
+            .no_mclk = false,       /* 使用 MCLK（I2S IO36 输出 256×fs） */
+        },
+        .adc_cfg = {
+            .digital_mic = false,   /* ES8389 模拟麦克风输入 */
+            .label = NULL,
+        },
+        .dac_cfg = { 0 },           /* 无内部 DAC 参考环回 */
+        .pa_cfg = {
+            .pa_pin = -1,           /* PA 由 bsp_amplifier 管理（防双控） */
+            .pa_active_low = false,
+            .hw_gain = {
+                .pa_voltage = 5.0f,         /* NS4150B 供电（按实际电路） */
+                .codec_dac_voltage = 3.3f,  /* ES8389 DAC 供电 */
+                .pa_gain = 0.0f,            /* 电路增益，仅影响音量 dB 标定 */
+            },
+        },
     };
     const audio_codec_if_t *codec_if = es8389_codec_new(&codec_cfg);
     if (codec_if == NULL) {

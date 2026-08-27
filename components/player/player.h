@@ -54,6 +54,22 @@ esp_err_t player_init(void);
 esp_err_t player_play_file(const char *path);
 
 /**
+ * @brief Play an audio file from the SD card in loop mode (repeat forever).
+ *        Playback restarts automatically on FINISHED until player_stop().
+ * @param[in] path  Same convention as player_play_file().
+ * @return ESP_OK when the pipeline started, error otherwise.
+ */
+esp_err_t player_play_loop(const char *path);
+
+/**
+ * @brief Download an audio file from a HTTP(S) URL to the SD card, then
+ *        play it in loop mode (async; returns after the download task starts).
+ * @param[in] url  HTTP(S) URL of the audio file (e.g. https://.../song.mp3).
+ * @return ESP_OK when the download task was scheduled, error otherwise.
+ */
+esp_err_t player_play_url(const char *url);
+
+/**
  * @brief Stop playback and release the codec.
  * @return ESP_OK on success.
  */

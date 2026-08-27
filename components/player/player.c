@@ -15,13 +15,27 @@
  * channels / bits from the decoded stream) and closed on STOPPED / FINISHED /
  * ERROR. The PA (NS4150B) is enabled only while a stream is active
  * (docs/PLAN.md 3.3.1 #3, no pop at boot).
+ *
+ * Loop mode (player_play_loop / player_play_url): on FINISHED the same URI
+ * is re-run automatically until player_stop(). The codec stays open across
+ * restarts (sample-rate change still re-opens through MUSIC_INFO).
+ *
+ * URL download (player_play_url): a static download task streams the file
+ * via esp_http_client into /sdcard/download/<name>, then starts loop
+ * playback. No dynamic allocation in this component (HTTP client internals
+ * are part of the IDF library, out of our MISRA scope).
  */
 
 #include <string.h>
+#include <stdio.h>
+#include <sys/stat.h>
 #include "sdkconfig.h"
 #include "esp_log.h"
+#include "esp_http_client.h"
 #include "esp_audio_simple_player.h"
 #include "esp_codec_dev.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "bsp_codec.h"
 #include "bsp_amplifier.h"
 #include "bsp_sdcard.h"
@@ -37,6 +51,18 @@ static esp_codec_dev_handle_t s_codec;
 static bool s_codec_open;
 static player_state_t s_state;
 static player_event_cb_t s_cb;
+
+/* ---------------- 循环播放状态 ---------------- */
+static bool s_loop;
+static char s_loop_uri[PLAYER_URI_MAX];
+
+/* ---------------- URL 下载任务 ---------------- */
+static FILE *s_dl_file;
+static char s_dl_url[CONFIG_LERO_PLAYER_DL_URL_MAX];
+static volatile bool s_dl_busy;
+static TaskHandle_t s_dl_task;
+static StaticTask_t s_dl_tcb;
+static StackType_t s_dl_stack[CONFIG_LERO_PLAYER_DL_TASK_STACK / sizeof(StackType_t)];
 
 /* ------------------------------------------------------------------------- */
 /* PCM / event callbacks (run in the ESP-GMF player task context)            */
@@ -54,6 +80,8 @@ static int s_pcm_out(uint8_t *data, int data_size, void *ctx)
 
 static void s_finish(player_state_t state)
 {
+    s_loop = false;
+    s_loop_uri[0] = '\0';
     if (s_codec_open) {
         (void)esp_codec_dev_close(s_codec);
         s_codec_open = false;
@@ -112,8 +140,19 @@ static int s_event(esp_asp_event_pkt_t *event, void *ctx)
             }
             break;
         case ESP_ASP_STATE_STOPPED:
-        case ESP_ASP_STATE_FINISHED:
             s_finish(PLAYER_STATE_FINISHED);
+            break;
+        case ESP_ASP_STATE_FINISHED:
+            if (s_loop && (s_loop_uri[0] != '\0')) {
+                /* 循环模式：自动重播同一 URI（codec 保持打开） */
+                ESP_LOGI(TAG, "loop: replaying %s", s_loop_uri);
+                if (esp_audio_simple_player_run(s_player, s_loop_uri, NULL) != ESP_GMF_ERR_OK) {
+                    ESP_LOGE(TAG, "loop replay failed");
+                    s_finish(PLAYER_STATE_ERROR);
+                }
+            } else {
+                s_finish(PLAYER_STATE_FINISHED);
+            }
             break;
         case ESP_ASP_STATE_ERROR:
             ESP_LOGE(TAG, "player error");
@@ -184,11 +223,34 @@ static esp_err_t s_build_uri(const char *path, char *uri, size_t uri_size)
     return ESP_OK;
 }
 
-esp_err_t player_play_file(const char *path)
+/* 内部播放入口：uri 为完整 file:// URI；loop 指定是否循环 */
+static esp_err_t s_play_uri(const char *uri, bool loop)
 {
-    if (s_player == NULL) {
+    if ((s_player == NULL) || (uri == NULL)) {
         return ESP_ERR_INVALID_STATE;
     }
+    /* 若正在播放，先停止（会关闭 codec，下一次 run 重新打开） */
+    if (s_state == PLAYER_STATE_PLAYING || s_state == PLAYER_STATE_PAUSED) {
+        (void)esp_audio_simple_player_stop(s_player);
+    }
+    s_loop = loop;
+    if (loop) {
+        (void)strlcpy(s_loop_uri, uri, sizeof(s_loop_uri));
+    } else {
+        s_loop_uri[0] = '\0';
+    }
+    esp_gmf_err_t gerr = esp_audio_simple_player_run(s_player, uri, NULL);
+    if (gerr != ESP_GMF_ERR_OK) {
+        ESP_LOGE(TAG, "run %s failed: %d", uri, (int)gerr);
+        s_loop = false;
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "playing %s%s", uri, loop ? " (loop)" : "");
+    return ESP_OK;
+}
+
+esp_err_t player_play_file(const char *path)
+{
     esp_err_t err = bsp_sdcard_poll();          /* 挂载 SD（延迟挂载 + 轮询） */
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "SD unavailable: %s", esp_err_to_name(err));
@@ -200,17 +262,23 @@ esp_err_t player_play_file(const char *path)
     if (err != ESP_OK) {
         return err;
     }
-    /* 若正在播放，先停止（会关闭 codec，下一次 run 重新打开） */
-    if (s_state == PLAYER_STATE_PLAYING || s_state == PLAYER_STATE_PAUSED) {
-        (void)esp_audio_simple_player_stop(s_player);
+    return s_play_uri(uri, false);
+}
+
+esp_err_t player_play_loop(const char *path)
+{
+    esp_err_t err = bsp_sdcard_poll();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "SD unavailable: %s", esp_err_to_name(err));
+        s_state = PLAYER_STATE_ERROR;
+        return err;
     }
-    esp_gmf_err_t gerr = esp_audio_simple_player_run(s_player, uri, NULL);
-    if (gerr != ESP_GMF_ERR_OK) {
-        ESP_LOGE(TAG, "run %s failed: %d", uri, (int)gerr);
-        return ESP_FAIL;
+    char uri[PLAYER_URI_MAX];
+    err = s_build_uri(path, uri, sizeof(uri));
+    if (err != ESP_OK) {
+        return err;
     }
-    ESP_LOGI(TAG, "playing %s", uri);
-    return ESP_OK;
+    return s_play_uri(uri, true);
 }
 
 esp_err_t player_stop(void)
@@ -266,4 +334,137 @@ esp_err_t player_get_state(player_state_t *state)
 void player_register_event_cb(player_event_cb_t cb)
 {
     s_cb = cb;
+}
+
+/* ------------------------------------------------------------------------- */
+/* URL 下载 + 循环播放（player_play_url）                                      */
+/* ------------------------------------------------------------------------- */
+
+/* 从 URL 提取文件名：取最后一个 '/' 之后、'?' 之前；无扩展名时补 .mp3 */
+static void s_extract_filename(const char *url, char *out, size_t out_size)
+{
+    out[0] = '\0';
+    if ((url == NULL) || (out_size == 0U)) {
+        return;
+    }
+    const char *slash = strrchr(url, '/');
+    const char *base = (slash != NULL) ? (slash + 1) : url;
+    const char *q = strchr(base, '?');
+    const size_t len = (q != NULL) ? (size_t)(q - base) : strlen(base);
+    if ((len == 0U) || (len >= out_size)) {
+        (void)strlcpy(out, "song.mp3", out_size);
+        return;
+    }
+    (void)memcpy(out, base, len);
+    out[len] = '\0';
+    /* 无扩展名：补 .mp3（多数音乐直链带扩展名，此处兜底） */
+    if (strrchr(out, '.') == NULL) {
+        (void)strlcat(out, ".mp3", out_size);
+    }
+}
+
+static esp_err_t s_http_event(esp_http_client_event_t *evt)
+{
+    if (evt->event_id == HTTP_EVENT_ON_DATA) {
+        if (s_dl_file != NULL) {
+            (void)fwrite(evt->data, 1U, (size_t)evt->data_len, s_dl_file);
+        }
+    }
+    return ESP_OK;
+}
+
+static void s_download_task(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        uint32_t notify = 0U;
+        (void)xTaskNotifyWait(0U, UINT32_MAX, &notify, portMAX_DELAY);
+        if ((notify & 1U) == 0U) {
+            continue;
+        }
+
+        s_dl_file = NULL;
+        esp_err_t err = bsp_sdcard_poll();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "download: SD unavailable");
+            s_dl_busy = false;
+            continue;
+        }
+
+        char name[CONFIG_LERO_PLAYER_DL_URL_MAX];
+        s_extract_filename(s_dl_url, name, sizeof(name));
+        char dir[96];
+        (void)snprintf(dir, sizeof(dir), "%s", CONFIG_LERO_PLAYER_DL_DIR);
+        (void)mkdir(dir, 0755);
+
+        char path[128];
+        (void)snprintf(path, sizeof(path), "%s/%s", CONFIG_LERO_PLAYER_DL_DIR, name);
+        ESP_LOGI(TAG, "download: %s -> %s", s_dl_url, path);
+
+        s_dl_file = fopen(path, "wb");
+        if (s_dl_file == NULL) {
+            ESP_LOGE(TAG, "download: open %s failed", path);
+            s_dl_busy = false;
+            continue;
+        }
+
+        esp_http_client_config_t cfg = {
+            .url = s_dl_url,
+            .event_handler = s_http_event,
+            .timeout_ms = CONFIG_LERO_PLAYER_DL_TIMEOUT_MS,
+            .buffer_size = CONFIG_LERO_PLAYER_DL_BUFFER,
+        };
+        esp_http_client_handle_t client = esp_http_client_init(&cfg);
+        if (client == NULL) {
+            ESP_LOGE(TAG, "download: http client init failed");
+            (void)fclose(s_dl_file);
+            s_dl_file = NULL;
+            s_dl_busy = false;
+            continue;
+        }
+        err = esp_http_client_perform(client);
+        esp_http_client_cleanup(client);
+        (void)fclose(s_dl_file);
+        s_dl_file = NULL;
+
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "download failed: %s", esp_err_to_name(err));
+            (void)remove(path);
+            s_dl_busy = false;
+            continue;
+        }
+        s_dl_busy = false;
+        ESP_LOGI(TAG, "download done, playing loop: %s", path);
+        (void)player_play_loop(path);       /* 下载完成：循环播放 */
+    }
+}
+
+esp_err_t player_play_url(const char *url)
+{
+    if ((url == NULL) || (s_player == NULL)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (s_dl_busy) {
+        ESP_LOGW(TAG, "download already in progress");
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (strlen(url) >= sizeof(s_dl_url)) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+    (void)strlcpy(s_dl_url, url, sizeof(s_dl_url));
+
+    if (s_dl_task == NULL) {
+        s_dl_task = xTaskCreateStaticPinnedToCore(
+            s_download_task, "player_dl",
+            (uint32_t)(sizeof(s_dl_stack) / sizeof(StackType_t)),
+            NULL, CONFIG_LERO_PLAYER_DL_TASK_PRIORITY,
+            s_dl_stack, &s_dl_tcb, CONFIG_LERO_PLAYER_DL_TASK_CORE);
+        if (s_dl_task == NULL) {
+            return ESP_FAIL;
+        }
+    }
+    s_dl_busy = true;
+    (void)xTaskNotifyGive(s_dl_task);
+    ESP_LOGI(TAG, "download scheduled: %s", url);
+    return ESP_OK;
 }

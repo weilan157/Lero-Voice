@@ -5,7 +5,7 @@ idf_component_register(
         "voice_transport.c"
         "voice_wake.c"
     INCLUDE_DIRS "."
-    REQUIRES bsp esp_codec_dev
+    REQUIRES bsp esp_codec_dev player
     PRIV_REQUIRES
         esp_timer
         esp_common

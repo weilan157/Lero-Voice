@@ -18,7 +18,9 @@
  */
 
 #include <string.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include "sdkconfig.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -26,6 +28,7 @@
 #include "freertos/task.h"
 #include "esp_codec_dev.h"
 #include "bsp_codec.h"
+#include "bsp_sdcard.h"
 #include "voice_internal.h"
 
 #define TAG "voice_capture"
@@ -125,4 +128,139 @@ voice_capture_result_t voice_capture_run(volatile bool *stop)
         (void)esp_codec_dev_close(s_codec);
     }
     return res;
+}
+
+/* ------------------------------------------------------------------------- */
+/* 录音：PCM(48k/2ch/16bit) -> WAV 文件（SD 卡），录完回填文件头              */
+/* ------------------------------------------------------------------------- */
+
+/* 逐字节填充 44 字节 RIFF/WAVE 头（MISRA 友好，不用 packed struct） */
+static void s_wav_fill_header(uint8_t *hdr, uint32_t sample_rate,
+                              uint16_t channels, uint16_t bits,
+                              uint32_t data_size)
+{
+    const uint32_t byte_rate = sample_rate * (uint32_t)channels * (uint32_t)(bits / 8U);
+    const uint16_t block_align = (uint16_t)(channels * (bits / 8U));
+    const uint32_t riff_size = 36U + data_size;
+
+    (void)memcpy(&hdr[0], "RIFF", 4U);
+    hdr[4] = (uint8_t)(riff_size & 0xFFU);
+    hdr[5] = (uint8_t)((riff_size >> 8) & 0xFFU);
+    hdr[6] = (uint8_t)((riff_size >> 16) & 0xFFU);
+    hdr[7] = (uint8_t)((riff_size >> 24) & 0xFFU);
+    (void)memcpy(&hdr[8], "WAVE", 4U);
+    (void)memcpy(&hdr[12], "fmt ", 4U);
+    hdr[16] = 16U;                      /* fmt chunk size = 16 */
+    hdr[17] = 0U;
+    hdr[18] = 1U;                       /* PCM */
+    hdr[19] = 0U;
+    hdr[20] = (uint8_t)(channels & 0xFFU);
+    hdr[21] = (uint8_t)((channels >> 8) & 0xFFU);
+    hdr[22] = (uint8_t)(sample_rate & 0xFFU);
+    hdr[23] = (uint8_t)((sample_rate >> 8) & 0xFFU);
+    hdr[24] = (uint8_t)((sample_rate >> 16) & 0xFFU);
+    hdr[25] = (uint8_t)((sample_rate >> 24) & 0xFFU);
+    hdr[26] = (uint8_t)(byte_rate & 0xFFU);
+    hdr[27] = (uint8_t)((byte_rate >> 8) & 0xFFU);
+    hdr[28] = (uint8_t)((byte_rate >> 16) & 0xFFU);
+    hdr[29] = (uint8_t)((byte_rate >> 24) & 0xFFU);
+    hdr[30] = (uint8_t)(block_align & 0xFFU);
+    hdr[31] = (uint8_t)((block_align >> 8) & 0xFFU);
+    hdr[32] = (uint8_t)(bits & 0xFFU);
+    hdr[33] = (uint8_t)((bits >> 8) & 0xFFU);
+    (void)memcpy(&hdr[36], "data", 4U);
+    hdr[40] = (uint8_t)(data_size & 0xFFU);
+    hdr[41] = (uint8_t)((data_size >> 8) & 0xFFU);
+    hdr[42] = (uint8_t)((data_size >> 16) & 0xFFU);
+    hdr[43] = (uint8_t)((data_size >> 24) & 0xFFU);
+}
+
+esp_err_t voice_capture_record_run(uint32_t seconds, const char *path,
+                                   volatile bool *stop)
+{
+    if ((seconds == 0U) || (seconds > 600U) || (path == NULL)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (s_codec == NULL) {
+        return ESP_ERR_NOT_FOUND;
+    }
+    esp_err_t err = bsp_sdcard_poll();          /* 确保 SD 已挂载 */
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "record: SD unavailable: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    /* 打开 codec IN（与聆听同格式，共享时钟域）；播放器占用时共享双工 */
+    esp_codec_dev_sample_info_t fs = {
+        .sample_rate = CONFIG_LERO_VOICE_SAMPLE_RATE,
+        .channel = CONFIG_LERO_VOICE_CHANNELS,
+        .bits_per_sample = 16,
+    };
+    const bool opened = (esp_codec_dev_open(s_codec, &fs) == ESP_CODEC_DEV_OK);
+    if (!opened) {
+        ESP_LOGD(TAG, "record: codec already open; reading shared duplex");
+    }
+
+    /* 确保目标目录存在（取路径最后一个 '/' 之前的目录部分） */
+    char dir[96];
+    (void)strlcpy(dir, path, sizeof(dir));
+    char *slash = strrchr(dir, '/');
+    if ((slash != NULL) && (slash != dir)) {
+        *slash = '\0';
+        (void)mkdir(dir, 0755);
+    }
+
+    FILE *fp = fopen(path, "wb");
+    if (fp == NULL) {
+        ESP_LOGE(TAG, "record: open %s failed", path);
+        if (opened) {
+            (void)esp_codec_dev_close(s_codec);
+        }
+        return ESP_FAIL;
+    }
+
+    /* 先写占位头，录完回填 */
+    uint8_t hdr[44];
+    s_wav_fill_header(hdr, CONFIG_LERO_VOICE_SAMPLE_RATE,
+                      CONFIG_LERO_VOICE_CHANNELS, 16U, 0U);
+    (void)fwrite(hdr, 1U, sizeof(hdr), fp);
+
+    const int64_t start_us = esp_timer_get_time();
+    const int64_t duration_us = (int64_t)seconds * 1000000LL;
+    uint32_t data_size = 0U;
+    bool io_error = false;
+
+    while ((stop == NULL) || !(*stop)) {
+        if ((esp_timer_get_time() - start_us) >= duration_us) {
+            break;
+        }
+        const int got = esp_codec_dev_read(s_codec, s_pcm, FRAME_BYTES);
+        if (got <= 0) {
+            vTaskDelay(pdMS_TO_TICKS(2U));
+            continue;
+        }
+        if (fwrite(s_pcm, 1U, (size_t)got, fp) != (size_t)got) {
+            ESP_LOGE(TAG, "record: write failed (SD full?)");
+            io_error = true;
+            break;
+        }
+        data_size += (uint32_t)got;
+    }
+
+    /* 回填 WAV 头（data_size 已知） */
+    s_wav_fill_header(hdr, CONFIG_LERO_VOICE_SAMPLE_RATE,
+                      CONFIG_LERO_VOICE_CHANNELS, 16U, data_size);
+    (void)fseek(fp, 0L, SEEK_SET);
+    (void)fwrite(hdr, 1U, sizeof(hdr), fp);
+    (void)fclose(fp);
+
+    if (opened) {
+        (void)esp_codec_dev_close(s_codec);
+    }
+
+    ESP_LOGI(TAG, "record done: %s (%u bytes, %.1f s)",
+             path, (unsigned)data_size,
+             (double)data_size / (double)(CONFIG_LERO_VOICE_SAMPLE_RATE *
+                                          CONFIG_LERO_VOICE_CHANNELS * 2U));
+    return io_error ? ESP_FAIL : ESP_OK;
 }

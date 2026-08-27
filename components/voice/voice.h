@@ -38,6 +38,7 @@ extern "C" {
 typedef enum {
     VOICE_STATE_IDLE = 0,       /*< 空闲 */
     VOICE_STATE_LISTENING,      /*< 聆听中（采集 + VAD + 上传） */
+    VOICE_STATE_RECORDING,      /*< 录音中（写 WAV 到 SD，console: rec） */
     VOICE_STATE_PROCESSING,     /*< 云端处理中（M9） */
     VOICE_STATE_SPEAKING,       /*< TTS 播报中（M9） */
 } voice_state_t;
@@ -61,6 +62,22 @@ esp_err_t voice_listen_start(void);
  * @return ESP_OK on success.
  */
 esp_err_t voice_listen_stop(void);
+
+/**
+ * @brief Record audio for a fixed duration into a WAV file on the SD card,
+ *        then play it back automatically (console test command "rec").
+ * @param[in] seconds  Recording duration (1..600). 0 = use Kconfig default.
+ * @param[in] path     Output WAV path, absolute SD path (e.g.
+ *                     "/sdcard/record/rec.wav"). NULL = Kconfig default.
+ * @return ESP_OK when the recording session was scheduled.
+ */
+esp_err_t voice_record_start(uint32_t seconds, const char *path);
+
+/**
+ * @brief Stop the current recording session early (keeps the WAV file).
+ * @return ESP_OK on success.
+ */
+esp_err_t voice_record_stop(void);
 
 /**
  * @brief Get the current voice state.

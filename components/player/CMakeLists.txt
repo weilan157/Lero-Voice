@@ -5,6 +5,7 @@ idf_component_register(
     REQUIRES bsp esp_audio_simple_player esp_codec_dev
     PRIV_REQUIRES
         esp_common
+        esp_http_client
         esp_system
         log
         freertos

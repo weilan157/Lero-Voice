@@ -14,4 +14,34 @@ config LERO_PLAYER_DEFAULT_VOLUME
     default 60
     range 0 100
 
+config LERO_PLAYER_DL_TASK_PRIORITY
+    int "URL download task priority"
+    default 8
+    range 1 18
+
+config LERO_PLAYER_DL_TASK_STACK
+    int "URL download task stack (bytes)"
+    default 6144
+
+config LERO_PLAYER_DL_TASK_CORE
+    int "URL download task core (0=PRO_CPU, 1=APP_CPU)"
+    default 0
+    range 0 1
+
+config LERO_PLAYER_DL_URL_MAX
+    int "Max download URL length (bytes)"
+    default 256
+
+config LERO_PLAYER_DL_TIMEOUT_MS
+    int "HTTP download timeout (ms)"
+    default 15000
+
+config LERO_PLAYER_DL_BUFFER
+    int "HTTP download buffer size (bytes)"
+    default 2048
+
+config LERO_PLAYER_DL_DIR
+    string "Download directory on SD card"
+    default "/sdcard/download"
+
 endmenu

@@ -21,6 +21,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "player.h"
 #include "voice.h"
 #include "voice_internal.h"
 
@@ -30,6 +31,12 @@ static voice_state_t s_state;
 static voice_event_cb_t s_cb;
 static volatile bool s_listen_request;
 static volatile bool s_listen_stop;
+
+/* 录音请求（console: rec） */
+static volatile bool s_record_request;
+static volatile bool s_record_stop;
+static uint32_t s_record_seconds;
+static char s_record_path[96];
 
 static StackType_t s_voice_stack[CONFIG_LERO_VOICE_TASK_STACK / sizeof(StackType_t)];
 static StaticTask_t s_voice_tcb;
@@ -66,6 +73,21 @@ static void s_voice_task(void *arg)
             ESP_LOGI(TAG, "session: frames=%lu bytes=%lu utterance=%d",
                      (unsigned long)res.frames, (unsigned long)res.bytes,
                      (int)res.utterance);
+        } else if (s_record_request) {
+            s_record_request = false;
+            s_record_stop = false;
+            voice_set_state(VOICE_STATE_RECORDING, "record start");
+
+            const esp_err_t err = voice_capture_record_run(
+                s_record_seconds, s_record_path, &s_record_stop);
+            s_record_stop = false;
+
+            voice_set_state(VOICE_STATE_IDLE,
+                            (err == ESP_OK) ? "record done" : "record failed");
+            if (err == ESP_OK) {
+                ESP_LOGI(TAG, "record ok, auto playing: %s", s_record_path);
+                (void)player_play_file(s_record_path);  /* 录完直接播放 */
+            }
         }
         vTaskDelay(pdMS_TO_TICKS(50U));
     }
@@ -116,6 +138,39 @@ esp_err_t voice_listen_start(void)
 esp_err_t voice_listen_stop(void)
 {
     s_listen_stop = true;                   /* 采集循环每帧检查 */
+    return ESP_OK;
+}
+
+esp_err_t voice_record_start(uint32_t seconds, const char *path)
+{
+    if (!s_task_started) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (s_state == VOICE_STATE_RECORDING) {
+        return ESP_OK;                      /* 已在录音 */
+    }
+    if (seconds == 0U) {
+        seconds = (uint32_t)CONFIG_LERO_VOICE_RECORD_DEFAULT_SECONDS;
+    }
+    if ((seconds > 600U)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    s_record_seconds = seconds;
+    if (path != NULL) {
+        (void)strlcpy(s_record_path, path, sizeof(s_record_path));
+    } else {
+        (void)strlcpy(s_record_path, CONFIG_LERO_VOICE_RECORD_DEFAULT_PATH,
+                      sizeof(s_record_path));
+    }
+    s_record_request = true;
+    ESP_LOGI(TAG, "record scheduled: %u s -> %s",
+             (unsigned)seconds, s_record_path);
+    return ESP_OK;
+}
+
+esp_err_t voice_record_stop(void)
+{
+    s_record_stop = true;                   /* 录音循环每帧检查 */
     return ESP_OK;
 }
 

@@ -31,6 +31,10 @@ esp_err_t voice_capture_init(void);
 /* 运行一次聆听会话（阻塞式，直至 stop/超时/端点）；*stop 由外部置位 */
 voice_capture_result_t voice_capture_run(volatile bool *stop);
 
+/* 录音 seconds 秒到 WAV 文件（阻塞式）；*stop 由外部置位提前结束 */
+esp_err_t voice_capture_record_run(uint32_t seconds, const char *path,
+                                   volatile bool *stop);
+
 /* voice_transport.c */
 esp_err_t voice_transport_init(void);
 esp_err_t voice_transport_send(const int16_t *pcm, size_t frames,
