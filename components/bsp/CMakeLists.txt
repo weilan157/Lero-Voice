@@ -13,6 +13,7 @@ idf_component_register(
         "bsp_display.c"
         "bsp_touch.c"
     INCLUDE_DIRS "."
+    REQUIRES esp_lcd_touch_ft5x06
     PRIV_REQUIRES
         esp_driver_gpio
         esp_driver_i2c

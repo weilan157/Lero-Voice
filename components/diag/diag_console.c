@@ -31,6 +31,11 @@
 #include "bsp.h"
 #include "bsp_power.h"
 #include "bsp_sdcard.h"
+#include "bsp_imu.h"
+#include "bsp_codec.h"
+#include "bsp_touch.h"
+#include "bsp_i2c.h"
+#include "driver/i2c_master.h"
 #include "provisioning.h"
 #include "ota_service.h"
 #include "player.h"
@@ -316,6 +321,175 @@ static int cmd_rec_stop(int argc, char **argv)
     return 0;
 }
 
+static int cmd_imu(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    if (!bsp_imu_is_present()) {
+        printf("imu: not found\n");
+        return 0;
+    }
+    bsp_imu_vec3_t a;
+    bsp_imu_vec3_t g;
+    int32_t t = 0;
+    if (bsp_imu_read_accel(&a) == ESP_OK) {
+        printf("accel: x=%ld y=%ld z=%ld (mg)\n",
+               (long)a.x, (long)a.y, (long)a.z);
+    }
+    if (bsp_imu_read_gyro(&g) == ESP_OK) {
+        printf("gyro:  x=%ld y=%ld z=%ld (mdps)\n",
+               (long)g.x, (long)g.y, (long)g.z);
+    }
+    if (bsp_imu_read_temp(&t) == ESP_OK) {
+        printf("temp:  %ld.%02ld C\n", (long)(t / 1000), (long)((t % 1000) / 10));
+    }
+    return 0;
+}
+
+static void s_scan_bus(const char *name, i2c_master_bus_handle_t bus)
+{
+    printf("%s: ", name);
+    bool any = false;
+    for (uint16_t addr = 0x03U; addr <= 0x77U; addr++) {
+        if (i2c_master_probe(bus, addr, 20) == ESP_OK) {
+            printf("0x%02X ", (unsigned)addr);
+            any = true;
+        }
+    }
+    printf("%s\n", any ? "" : "(none)");
+}
+
+static int cmd_i2c_scan(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    i2c_master_bus_handle_t bus = NULL;
+    if (bsp_i2c_get_bus0(&bus) == ESP_OK) {
+        s_scan_bus("I2C0 (codec/imu)", bus);
+    } else {
+        printf("I2C0: bus not created\n");
+    }
+    if (bsp_i2c_get_bus1(&bus) == ESP_OK) {
+        s_scan_bus("I2C1 (touch)", bus);
+    } else {
+        printf("I2C1: bus not created\n");
+    }
+    return 0;
+}
+
+static int cmd_reg(int argc, char **argv)
+{
+    if (argc != 4) {
+        printf("usage: reg <bus0|bus1> <addr7> <reg>\n");
+        return 1;
+    }
+    i2c_master_bus_handle_t bus = NULL;
+    esp_err_t err = (strcmp(argv[1], "bus1") == 0) ? bsp_i2c_get_bus1(&bus)
+                                                   : bsp_i2c_get_bus0(&bus);
+    if (err != ESP_OK) {
+        printf("bus unavailable\n");
+        return 0;
+    }
+    const uint16_t addr = (uint16_t)strtol(argv[2], NULL, 0);
+    const uint8_t reg = (uint8_t)strtol(argv[3], NULL, 0);
+    i2c_master_dev_handle_t dev = NULL;
+    i2c_device_config_t dev_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = addr,
+        .scl_speed_hz = 400000U,
+    };
+    err = i2c_master_bus_add_device(bus, &dev_cfg, &dev);
+    if (err != ESP_OK) {
+        printf("add device 0x%02X failed\n", (unsigned)addr);
+        return 0;
+    }
+    uint8_t val = 0U;
+    err = i2c_master_transmit_receive(dev, &reg, 1U, &val, 1U, 100);
+    if (err == ESP_OK) {
+        printf("0x%02X[0x%02X] = 0x%02X\n", (unsigned)addr, (unsigned)reg, (unsigned)val);
+    } else {
+        printf("read failed: %s\n", esp_err_to_name(err));
+    }
+    (void)i2c_master_bus_rm_device(dev);
+    return 0;
+}
+
+static int cmd_codec(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    if (!bsp_codec_is_present()) {
+        printf("codec: not found (AUD_3V3 / 0x20 / I2C0)\n");
+        return 0;
+    }
+    printf("ES8389 registers:\n");
+    static const uint8_t groups[][2] = {
+        { 0x00U, 0x0AU },  /* 复位/时钟管理 */
+        { 0x21U, 0x26U },  /* ADC 控制 */
+        { 0x40U, 0x43U },  /* DAC 控制 */
+        { 0x60U, 0x64U },  /* 模拟 */
+    };
+    for (size_t g = 0U; g < (sizeof(groups) / sizeof(groups[0])); g++) {
+        for (uint8_t r = groups[g][0]; r <= groups[g][1]; r++) {
+            uint8_t v = 0U;
+            if (bsp_codec_read_reg(r, &v) == ESP_OK) {
+                printf("  0x%02X = 0x%02X\n", (unsigned)r, (unsigned)v);
+            } else {
+                printf("  0x%02X = ERR\n", (unsigned)r);
+            }
+        }
+    }
+    return 0;
+}
+
+static int cmd_power(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    uint32_t mv = 0U;
+    if (bsp_power_get_battery_mv(&mv) == ESP_OK) {
+        printf("battery: %lu mV\n", (unsigned long)mv);
+    } else {
+        printf("battery: n/a\n");
+    }
+    if (bsp_power_get_bus_mv(&mv) == ESP_OK) {
+        printf("bus:     %lu mV\n", (unsigned long)mv);
+    } else {
+        printf("bus: n/a\n");
+    }
+    bool charging = false;
+    if (bsp_power_get_charge_state(&charging) == ESP_OK) {
+        printf("charging: %d\n", (int)charging);
+    }
+    uint8_t pct = 0U;
+    if (bsp_power_get_battery_pct(&pct) == ESP_OK) {
+        printf("battery pct: %u%%\n", (unsigned)pct);
+    }
+    return 0;
+}
+
+static int cmd_touch(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    if (bsp_touch_get_handle() == NULL) {
+        printf("touch: not initialized\n");
+        return 0;
+    }
+    bsp_touch_point_t p;
+    esp_err_t err = bsp_touch_read_point(&p);
+    if (err == ESP_OK) {
+        printf("touch: %s", p.pressed ? "pressed" : "idle");
+        if (p.pressed) {
+            printf(" x=%u y=%u", (unsigned)p.x, (unsigned)p.y);
+        }
+        printf("\n");
+    } else {
+        printf("touch read failed: %s\n", esp_err_to_name(err));
+    }
+    return 0;
+}
+
 static int cmd_stop(int argc, char **argv)
 {
     (void)argc;
@@ -475,6 +649,12 @@ esp_err_t diag_console_register(void)
         { .command = "voice",    .help = "voice state",                 .hint = NULL, .func = cmd_voice },
         { .command = "voice-listen", .help = "start voice listen",      .hint = NULL, .func = cmd_voice_listen },
         { .command = "voice-stop",   .help = "stop voice listen",       .hint = NULL, .func = cmd_voice_stop },
+        { .command = "imu",      .help = "read QMI8658A accel/gyro/temp", .hint = NULL, .func = cmd_imu },
+        { .command = "i2c-scan", .help = "scan I2C0/I2C1 for devices",    .hint = NULL, .func = cmd_i2c_scan },
+        { .command = "reg",      .help = "reg <bus0|bus1> <addr7> <reg>", .hint = NULL, .func = cmd_reg },
+        { .command = "codec",    .help = "ES8389 register dump",          .hint = NULL, .func = cmd_codec },
+        { .command = "power",    .help = "battery/bus voltage + charging",.hint = NULL, .func = cmd_power },
+        { .command = "touch",    .help = "FT6336U status + coordinates",  .hint = NULL, .func = cmd_touch },
     };
     for (size_t i = 0U; i < (sizeof(s_cmds) / sizeof(s_cmds[0])); i++) {
         const esp_err_t err = esp_console_cmd_register(&s_cmds[i]);

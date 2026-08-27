@@ -40,7 +40,10 @@ extern "C" {
 #define BSP_I2S_LRCK_GPIO           GPIO_NUM_4
 #define BSP_I2S_SDOUT_GPIO          GPIO_NUM_5
 #define BSP_I2S_DSDIN_GPIO          GPIO_NUM_6
-#define BSP_I2S_MCLK_GPIO           GPIO_NUM_36   /* 原理图修订建议，见 PLAN 2.6 #1 */
+/* MCLK：本板无此网络（用户确认 2026-08-27；IO36 已给屏幕 DB14）。
+ * 采用官方驱动的 **BCLK PIN 模式**（no_mclk=true）：ES8389 内部时钟从
+ * I2S BCLK 派生，无需外部 MCLK，也无需 I2S 输出 MCLK（I2S_GPIO_UNUSED）。 */
+/* #define BSP_I2S_MCLK_GPIO        GPIO_NUM_36 */
 
 /* ---------------- Amplifier: NS4150B x2 (PLAN 2.4.1) -------------------- */
 #define BSP_PA_CTRL_GPIO            GPIO_NUM_52
@@ -59,9 +62,9 @@ extern "C" {
 #define BSP_LCD_DB10_GPIO           GPIO_NUM_17
 #define BSP_LCD_DB11_GPIO           GPIO_NUM_18
 #define BSP_LCD_DB12_GPIO           GPIO_NUM_19
-#define BSP_LCD_DB13_GPIO           GPIO_NUM_33
-#define BSP_LCD_DB14_GPIO           GPIO_NUM_34
-#define BSP_LCD_DB15_GPIO           GPIO_NUM_35
+#define BSP_LCD_DB13_GPIO           GPIO_NUM_35   /* 2026-08-27 按用户清单：DB13~15=IO35/36/37 */
+#define BSP_LCD_DB14_GPIO           GPIO_NUM_36
+#define BSP_LCD_DB15_GPIO           GPIO_NUM_37
 #define BSP_LCD_DB16_GPIO           GPIO_NUM_38
 #define BSP_LCD_DB17_GPIO           GPIO_NUM_39
 #define BSP_LCD_PCLK_GPIO           GPIO_NUM_40

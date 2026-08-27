@@ -51,6 +51,14 @@ esp_err_t bsp_imu_read_accel(bsp_imu_vec3_t *accel);
 esp_err_t bsp_imu_read_gyro(bsp_imu_vec3_t *gyro);
 
 /**
+ * @brief Read the on-die temperature.
+ * @param[out] temp_milli_c Temperature in milli-Celsius (raw × 10;
+ *                          absolute accuracy needs calibration).
+ * @return ESP_OK / ESP_ERR_NOT_FOUND when no sensor.
+ */
+esp_err_t bsp_imu_read_temp(int32_t *temp_milli_c);
+
+/**
  * @brief Check whether the IMU was found during init.
  * @return true when present.
  */

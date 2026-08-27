@@ -10,6 +10,7 @@ idf_component_register(
     REQUIRES bsp provisioning ota_service player voice
     PRIV_REQUIRES
         console
+        esp_driver_i2c
         esp_app_format
         heap
         esp_system

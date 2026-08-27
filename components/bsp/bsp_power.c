@@ -124,7 +124,9 @@ esp_err_t bsp_power_init(void)
     }
     (void)gpio_set_level(BSP_LED_STATUS_GPIO, 1);   /* 默认熄灭（低电平点亮） */
 
-    ESP_LOGI(TAG, "power ready");
+    ESP_LOGI(TAG, "power ready (ADC2 ch%d/ch%d, atten=DB0, cali=%s)",
+             (int)CONFIG_LERO_BAT_ADC_CHANNEL, (int)CONFIG_LERO_BUS_ADC_CHANNEL,
+             (s_cali != NULL) ? "yes" : "no");
     return ESP_OK;
 }
 

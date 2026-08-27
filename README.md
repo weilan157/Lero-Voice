@@ -162,7 +162,7 @@ rec [秒]                  # 录音 N 秒（默认 30）→ WAV → 自动播放
 rec-stop                  # 提前结束录音
 ```
 
-> 播放管线：SD 文件 → ESP-GMF 解码（esp_audio_simple_player）→ PCM → ES8389（esp_codec_dev，I2S 主模式）。录音管线：ES8389 ADC → I2S RX → WAV（/sdcard/record/rec.wav）。⚠️ 当前原理图 MCLK 未接线（见 PLAN 2.6 #1），**音频出声音需先完成原理图修订**。
+> 播放管线：SD 文件 → ESP-GMF 解码（esp_audio_simple_player）→ PCM → ES8389（esp_codec_dev，I2S 主模式）。录音管线：ES8389 ADC → I2S RX → WAV（/sdcard/record/rec.wav）。✅ **无需 MCLK**：ES8389 用 BCLK PIN 模式（`no_mclk=true`，时钟从 I2S BCLK 派生，见 PLAN 2.6 #1）。
 
 ## 开发约定
 
@@ -173,15 +173,17 @@ rec-stop                  # 提前结束录音
 ## 文档
 
 - [🛠️ 开发环境搭建指南](docs/SETUP.md) — 依赖安装 / 首次配置 / VS Code / 常见问题排查
+- [🔧 上电行为与驱动调试指南](docs/DEBUG.md) — 启动流程 / console 命令速查 / 各驱动调试与故障排查 / 上板调试顺序
 - [📋 项目完整方案（v3.3）](docs/PLAN.md) — 硬件 / 逐模块引脚表 / 原理图核对记录 / BSP / 代码规范 / 配网详细步骤 / 智能家居 / OTA 双通道 / 分区表 / 调试诊断 / 里程碑 / 资料清单
 - [原理图（2026-08-25）](docs/SCH_Schematic1_1_2026-08-25.pdf)
 - [ESP32-S31-WROOM-3 数据手册（CN）](docs/esp32-s31-wroom-3_datasheet_cn.pdf)
+- [屏幕规格书与芯片手册](docs/01-规格书与芯片手册/) — ZJY400-8532ACT 模组规格书 + NV3052C 驱动 IC 数据手册（2026-08-27 归档）
 
 ## 项目进度
 
 - [x] 硬件方案选型
 - [x] 原理图设计
-- [ ] 原理图修订（补 MCLK / SD_DET、核对 IO48/49 标注）
+- [ ] 原理图修订（SD_DET 连接、核对 IO48/49 标注；MCLK 已由 BCLK PIN 模式解决）
 - [ ] PCB Layout
 - [x] 工程骨架 + 代码规范（MISRA / 无动态内存）（main + bsp + components）
 - [x] BSP 框架（bsp/ 十个模块 + 故障位图）

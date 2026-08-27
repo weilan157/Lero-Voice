@@ -113,3 +113,15 @@ esp_err_t bsp_i2c_get_bus0(i2c_master_bus_handle_t *bus)
     return ESP_OK;
 }
 
+esp_err_t bsp_i2c_get_bus1(i2c_master_bus_handle_t *bus)
+{
+    if (bus == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!s_bus1_created) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    *bus = s_bus1;
+    return ESP_OK;
+}
+

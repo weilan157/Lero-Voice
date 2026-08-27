@@ -42,23 +42,23 @@ config LERO_BSP_ENABLE_TOUCH
 
 config LERO_LCD_H_RES
     int "LCD horizontal resolution (px)"
-    default 480
+    default 720
 
 config LERO_LCD_V_RES
     int "LCD vertical resolution (px)"
-    default 854
+    default 720
 
 config LERO_LCD_PIXEL_CLOCK_HZ
     int "LCD pixel clock (Hz)"
-    default 16000000
+    default 31000000
 
 config LERO_LCD_HSYNC_PULSE
     int "LCD hsync pulse width (PCLK)"
-    default 10
+    default 1
 
 config LERO_LCD_HBP
     int "LCD hsync back porch (PCLK)"
-    default 20
+    default 79
 
 config LERO_LCD_HFP
     int "LCD hsync front porch (PCLK)"
@@ -66,15 +66,15 @@ config LERO_LCD_HFP
 
 config LERO_LCD_VSYNC_PULSE
     int "LCD vsync pulse width (lines)"
-    default 10
+    default 1
 
 config LERO_LCD_VBP
     int "LCD vsync back porch (lines)"
-    default 20
+    default 24
 
 config LERO_LCD_VFP
     int "LCD vsync front porch (lines)"
-    default 20
+    default 5
 
 config LERO_LCD_BL_FREQ_HZ
     int "Backlight PWM frequency (Hz)"

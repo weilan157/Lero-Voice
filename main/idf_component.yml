@@ -5,4 +5,6 @@
 dependencies:
   espressif/esp_codec_dev: "^1.6.2"            # ES8389 官方驱动（播放+录音）
   espressif/esp_audio_simple_player: "^1.0.0~2" # ESP-GMF 播放器（MP3/WAV/FLAC/AAC...）
+  espressif/esp_lvgl_adapter: "^0.5.0"         # S31 官方 LVGL 适配器（PLAN 2.4.2e）
+  espressif/esp_lcd_touch_ft5x06: "^1.1.1"     # FT6336U 触摸（FT5x06 协议族）
   idf: ">=6.1"

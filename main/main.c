@@ -30,6 +30,7 @@
 #include "ota_service.h"
 #include "player.h"
 #include "voice.h"
+#include "ui.h"
 #include "diag.h"
 
 #define TAG "main"
@@ -271,6 +272,11 @@ void app_main(void)
     /* 语音助手骨架（采集/VAD/上传接口；console: voice-*，见 diag） */
     if (voice_init() != ESP_OK) {
         ESP_LOGW(TAG, "voice init failed (降级：无语音采集)");
+    }
+
+    /* LVGL UI（上电跑官方 benchmark demo 显示 FPS；失败仅降级，不影响其余功能） */
+    if (ui_init() != ESP_OK) {
+        ESP_LOGW(TAG, "ui init failed (降级：无界面)");
     }
 
     /* 开机自动连接已保存的 WiFi 配置；无配置则自动进入配网模式（PLAN 4.3） */

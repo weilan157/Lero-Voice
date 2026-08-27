@@ -31,3 +31,11 @@ CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_BOOT_INIT=y
 CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
+
+# LVGL (esp_lvgl_adapter, official S31 scheme; docs/PLAN.md 2.4.2e)
+# 16-bit color (RGB565, panel driven at 16-bit with high bits effective)
+CONFIG_LV_COLOR_DEPTH_16=y
+# Use IDF heap (malloc) for LVGL internal allocations (PSRAM capable)
+CONFIG_LV_MEM_CUSTOM=y
+# Official benchmark demo (shows FPS) on boot
+CONFIG_LV_USE_DEMO_BENCHMARK=y

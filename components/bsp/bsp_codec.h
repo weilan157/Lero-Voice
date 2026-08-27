@@ -58,6 +58,14 @@ esp_err_t bsp_codec_set_volume(uint8_t volume_pct);
  */
 esp_err_t bsp_codec_mute(bool mute);
 
+/**
+ * @brief Read one ES8389 register over I2C0 (debug / console "codec").
+ * @param[in]  reg Register address (0x00..0xFF).
+ * @param[out] val Read value.
+ * @return ESP_OK / ESP_ERR_INVALID_STATE until the codec is probed.
+ */
+esp_err_t bsp_codec_read_reg(uint8_t reg, uint8_t *val);
+
 #ifdef __cplusplus
 }
 #endif

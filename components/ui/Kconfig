@@ -1,0 +1,21 @@
+menu "Lero Voice UI"
+
+config LERO_UI_TASK_STACK
+    int "LVGL task stack (bytes)"
+    default 8192
+
+config LERO_UI_TASK_PRIORITY
+    int "LVGL task priority"
+    default 6
+    range 1 18
+
+config LERO_UI_TASK_CORE
+    int "LVGL task core (-1 = no affinity)"
+    default -1
+    range -1 1
+
+config LERO_UI_DEMO_BENCHMARK
+    bool "Run LVGL official benchmark demo on boot (FPS)"
+    default y
+
+endmenu

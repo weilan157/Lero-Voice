@@ -24,9 +24,11 @@
  * espressif/esp-audio-dev 仓库（device/include/audio_codec_hw_cfg.h）
  * 语义填写：
  *   - sys_cfg.is_master=false : ESP32 I2S 主模式输出 BCLK/LRCK，codec 从模式
- *   - sys_cfg.no_mclk=false   : 使用外部 MCLK（由 I2S IO36 输出 256×fs）；
- *                               ES8389 无内部振荡器，MCLK 缺失时模拟
- *                               路径无声（PLAN 2.6 #1 原理图修订项）
+ *   - sys_cfg.no_mclk=true    : **BCLK PIN 模式**（官方驱动支持，REG0x02[7:6]=01）：
+ *                               ES8389 内部时钟从 I2S BCLK 派生，**无需外部 MCLK**；
+ *                               驱动按 BCLK 频率（fs×bits×2）查 coeff_div 系数表。
+ *                               原理图 pin4(MCLK/TDMIN) 与 DACDAT 短接共接
+ *                               I2S_DSDIN —— BCLK 模式下 pin4 不参与时钟，无影响
  *   - adc_cfg.digital_mic=false : ES8389 模拟麦克风（MIC1P/MIC1N）
  *   - pa_cfg.pa_pin=-1       : PA（NS4150B×2）由 bsp_amplifier 控制，
  *                              避免驱动与 BSP 双控 IO52
@@ -51,6 +53,7 @@
 static esp_codec_dev_handle_t s_codec_dev;
 static i2s_chan_handle_t s_i2s_tx;
 static i2s_chan_handle_t s_i2s_rx;
+static i2c_master_dev_handle_t s_probe;   /* I2C 探测句柄（寄存器调试用） */
 static bool s_present;
 
 static esp_err_t s_i2s_init(void)
@@ -72,7 +75,10 @@ static esp_err_t s_i2s_init(void)
         .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
                                                         I2S_SLOT_MODE_STEREO),
         .gpio_cfg = {
-            .mclk = BSP_I2S_MCLK_GPIO,          /* 原理图修订后生效（PLAN 2.6 #1） */
+            .mclk = I2S_GPIO_UNUSED,        /* BCLK PIN 模式（no_mclk=true）：
+                                             * ES8389 时钟从 I2S BCLK 派生，
+                                             * 无需输出 MCLK（官方驱动支持，
+                                             * 见 esp_codec_dev es8389.c） */
             .bclk = BSP_I2S_SCLK_GPIO,
             .ws = BSP_I2S_LRCK_GPIO,
             .dout = BSP_I2S_DSDIN_GPIO,         /* SoC -> ES8389 DAC */
@@ -129,11 +135,12 @@ esp_err_t bsp_codec_init(void)
     uint8_t val = 0U;
     err = i2c_master_transmit_receive(probe, &reg, 1U, &val, 1U, 100);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "codec 0x20 no ACK (%s); MCLK may be missing (PLAN 2.6 #1)",
+        ESP_LOGW(TAG, "codec 0x20 no ACK (%s); 排查 AUD_3V3 供电 / 地址 0x20 / I2C0 上拉",
                  esp_err_to_name(err));
         return err;
     }
     s_present = true;
+    s_probe = probe;
     ESP_LOGI(TAG, "ES8389 present at 0x20 (reg0=0x%02X)", (unsigned)val);
 
     /* 2. I2S 通道（主模式，引脚见 bsp_config.h） */
@@ -180,7 +187,8 @@ esp_err_t bsp_codec_init(void)
         .gpio_if = audio_codec_new_gpio(),
         .sys_cfg = {
             .is_master = false,     /* ESP32 I2S 主模式 → codec 从模式 */
-            .no_mclk = false,       /* 使用 MCLK（I2S IO36 输出 256×fs） */
+            .no_mclk = true,        /* BCLK PIN 模式：时钟从 I2S BCLK 派生，
+                                     * 无需外部 MCLK（官方驱动支持） */
         },
         .adc_cfg = {
             .digital_mic = false,   /* ES8389 模拟麦克风输入 */
@@ -252,4 +260,12 @@ esp_err_t bsp_codec_mute(bool mute)
         return ESP_FAIL;
     }
     return ESP_OK;
+}
+
+esp_err_t bsp_codec_read_reg(uint8_t reg, uint8_t *val)
+{
+    if ((val == NULL) || (s_probe == NULL)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    return i2c_master_transmit_receive(s_probe, &reg, 1U, val, 1U, 100);
 }

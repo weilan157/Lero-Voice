@@ -59,6 +59,13 @@ esp_err_t bsp_i2c_add_device1(uint16_t addr, uint32_t speed_hz, i2c_master_dev_h
  */
 esp_err_t bsp_i2c_get_bus0(i2c_master_bus_handle_t *bus);
 
+/**
+ * @brief Get the I2C1 master bus handle (touch bus, for esp_lcd_touch).
+ * @param[out] bus        Returned bus handle.
+ * @return ESP_OK / ESP_ERR_INVALID_STATE when the bus is not created.
+ */
+esp_err_t bsp_i2c_get_bus1(i2c_master_bus_handle_t *bus);
+
 #ifdef __cplusplus
 }
 #endif

@@ -57,7 +57,7 @@
 | **主控模块** | **ESP32-S31-WROOM-3-N16R16V** | RISC-V 双核 @ 320 MHz，16 MB Flash + 16 MB PSRAM，Wi-Fi 6 (802.11ax) + BLE 5.4 (LE Audio) + 802.15.4 + 千兆以太网 MAC，60 GPIO（模块引出 54），512 KB SRAM，最高 +85 °C | ✅ 已量产（2026-07） |
 | **音频 Codec** | **ES8389** | 24-bit / 8–96 kHz，DAC SNR 110 dB，立体声 ADC/DAC，双模拟麦输入，支持 DMIC 模式 | ✅ 原理图 U7 |
 | **音频功放** | **NS4150B × 2** | 3 W D 类功放，左右声道独立，CTRL 引脚使能（PA_CTRL） | ✅ 原理图 U10/U11 |
-| **屏幕** | 40-Pin RGB 并口 LCD（FPC：AFC24-S40FIA-00，0.5 mm 40P） | 18-bit RGB（DB0~DB17）+ DE/PCLK/HS/VS/RESET，背光 LEDA/LEDK，电容触摸（I2C） | ⚠️ **分辨率待确认** |
+| **屏幕** | 40-Pin RGB 并口 LCD（FPC：AFC24-S40FIA-00，0.5 mm 40P）| **模组 ZJY400-8532ACT**（4.0"，**720×720**，驱动 IC **NV3052CGRB**，触摸 **FT6336U**）| 18-bit RGB（DB0~DB17）+ DE/PCLK/HS/VS/RESET，背光 LEDA/LEDK（MP3302 升压），电容触摸（I2C 0x38）；**参数与驱动指南见 2.4.2d** |
 | **麦克风** | 模拟麦克风 × 2（MIC1P/N、MIC2P/N → ES8389） | 型号待定（原理图已预留 0 Ω 选焊电阻） | ⚠️ 型号待定 |
 | **SD 卡** | MicroSD 卡座 XKTF-001B | 4-bit SDIO（SD_D0~D3/CLK/CMD）+ 卡检测 SD_DET | ✅ |
 | **IMU** | QMI8658A | 6 轴惯性测量，I2C 地址 0x6A，INT1/INT2 中断 —— 屏幕方向 / 手势唤醒 | ✅ 原理图 U12 |
@@ -84,7 +84,7 @@
   │  I2S(SCLK/LRCK/SDOUT/DSDIN) ──► ES8389 ──► NS4150B ×2 ──► 喇叭 L/R │
   │  I2C0(SDA=IO0/SCL=IO1) ──► ES8389(0x20) / QMI8658A(0x6A)        │
   │  I2C1(SDA=IO46/SCL=IO47) ──► 触摸屏(TP_INT=IO2)               │
-  │  RGB18(DB0~17=IO7~19/33~35/38~39, DE/PCLK/HS/VS/RESET) ──► LCD │
+  │  RGB18(DB0~17=IO7~19/35~39, DE/PCLK/HS/VS/RESET) ──► LCD │
   │  SDIO(4-bit) + SD_DET ──► MicroSD                              │
   │  USB1_DP/DM ──► Type-C(数据) / USB_EN=IO53 ──► SY6280AAC        │
   │  IO55/56/57 ──► 功能键   BOOT=IO61 / EN ──► SW2/SW1            │
@@ -115,17 +115,20 @@
 | I2S 帧同步 | I2S_LRCK | 10 | **IO4** | |
 | I2S 数据输出（录音） | I2S_SDOUT | 11 | **IO5** | ES8389 → SoC |
 | I2S 数据输入（播放） | I2S_DSDIN | 12 | **IO6** | SoC → ES8389 |
-| I2S 主时钟 | I2S_MCLK | — | ⚠️ **未接主控** | 见 2.6 核对记录 |
+| I2S 主时钟 | I2S_MCLK | — | ✅ **不接，BCLK PIN 模式**（ES8389 时钟从 BCLK 派生，无需 MCLK） | 见 2.6 核对记录 / 6.2 |
 | I2C 数据 | SDA | 8 | **IO0** | ES8389(0x20) + QMI8658A(0x6A) 共用 |
 | I2C 时钟 | SCL | 9 | **IO1** | 同上 |
 | 功放使能 | PA_CTRL | 62 | **IO52** | NS4150B CTRL ×2 |
 
 #### 2.4.2 屏幕（RGB 18-bit 并口）
 
+> **模组：ZJY400-8532ACT**（4.0"，**720×720 方形屏**，FPC AFC24-S40FIA-00 40P）；**驱动 IC：NV3052CGRB**（RAMless）；**触摸：FT6336U**。
+> 规格书/数据手册已归档（2026-08-27）：`docs/01-规格书与芯片手册/`；完整参数与驱动指南见 **2.4.2d**（BSP 分辨率 480×854 → 720×720 待改）。
+
 | 信号 | 网络名 | 模块引脚 | GPIO |
 |------|--------|:--------:|:----:|
 | 数据 DB0~DB12 | DB0~DB12 | 13~25 | **IO7~IO19** |
-| 数据 DB13 / DB14 / DB15 | DB13/14/15 | 42 / 43 / 44 | **IO33 / IO34 / IO35** |
+| 数据 DB13 / DB14 / DB15 | DB13/14/15 | 44 / 45 / 46 | **IO35 / IO36 / IO37**（2026-08-27 按用户清单更新） |
 | 数据 DB16 / DB17 | DB16/17 | 49 / 50 | **IO38 / IO39** |
 | 像素时钟 | LCD_PCLK | 51 | **IO40** |
 | 数据使能 | LCD_DE | 52 | **IO42** |
@@ -134,7 +137,199 @@
 | 帧同步 | LCD_VS | 55 | **IO45** |
 | 背光使能/PWM | BL_EN | 64 | **IO54** | MP3302 驱动 |
 
+#### 2.4.2b 屏幕引脚清单（2026-08-27 用户提供，待与最新原理图核对）
+
+| 信号 | GPIO | 信号 | GPIO |
+|------|:----:|------|:----:|
+| BL_EN | IO54 | DB8 | IO15 |
+| LCD_RESET | IO43 | DB9 | IO16 |
+| LCD_PCLK | IO40 | DB10 | IO17 |
+| LCD_DE | IO42 | DB11 | IO18 |
+| LCD_VS | IO45 | DB12 | IO19* |
+| LCD_HS | IO44 | DB13 | IO35 |
+| DB0 | IO7 | DB14 | IO36 |
+| DB1 | IO8 | DB15 | IO37 |
+| DB2 | IO9 | DB16 | IO38 |
+| DB3 | IO10 | DB17 | IO39 |
+| DB4 | IO11 | TP_INT | IO2 |
+| DB5 | IO12 | TP_SDA | IO46 |
+| DB6 | IO13 | TP_SCL | IO47 |
+| DB7 | IO14 | TP_RST | IO48 |
+
+\* 原清单写作 **IO519**（S31 无此引脚，按相邻 DB 序列判定为 IO19 笔误）。
+
+**与 `bsp_config.h` 差异核对（2026-08-27 已按本清单更新代码）**：
+
+| 项 | 本清单 | 旧 bsp_config.h | 结果 |
+|----|:---:|:---:|------|
+| DB13 | IO35 | IO33 | ✅ 已更新 DB13~15 = 35/36/37 |
+| DB14 | IO36 | IO34 | ✅ 同上（MCLK 不再规划 IO36） |
+| DB15 | IO37 | IO35 | ✅ 同上 |
+| DB12 | IO19 | IO19 | 一致（519 为笔误） |
+
+> DB13~15 改位后 **IO33/34 空闲**（备用扩展）。MCLK 无需候选：ES8389 用 BCLK PIN 模式（见 2.6 #1）。
+
+其余信号与 `bsp_config.h` 一致 ✓（BL=54 / RESET=43 / PCLK=40 / DE=42 / VS=45 / HS=44 / DB0~11=IO7~18 / DB16~17=IO38~39 / TP_INT=2 / TP_SDA=46 / TP_SCL=47 / TP_RST=48）。
+
+#### 2.4.2c S31-WROOM-3 模块管脚定义（2026-08-27 用户提供，数据手册摘录）
+
+> 注：模块"序号" ≠ GPIO 号（模块含大量电源/地/空脚）；`IO362` 为原表笔误，应为 **IO36**（序号 45）。
+
+| 名称 | 序号 | 类型 | 功能 |
+|------|:---:|:---:|------|
+| GND | 1,2,26,47,48,72~90,92~99 | P | 接地 |
+| 3V3 | 3,4 | P | 供电 |
+| EN | 5 | I | 高电平使能；低电平关闭；**不可浮空** |
+| IO2 | 6 | I/O/T | GPIO2,LP_GPIO2,LP_UART_DTRN,LP_SPI_CK,LP_PROBE_TOP_OUT2,LCD_DATA19_OUT |
+| IO3 | 7 | I/O/T | GPIO3,LP_GPIO3,LP_UART_DSRN,LP_SPI_CS,LP_PROBE_TOP_OUT3,LCD_DATA20_OUT |
+| IO0 | 8 | I/O/T | GPIO0,LP_GPIO0,XTAL_32K_N,LP_PROBE_TOP_OUT0 |
+| IO1 | 9 | I/O/T | GPIO1,LP_GPIO1,XTAL_32K_P,LP_PROBE_TOP_OUT1 |
+| IO4 | 10 | I/O/T | GPIO4,LP_GPIO4,LP_UART_RTSN,LP_SPI_D,LP_PROBE_TOP_OUT4,LCD_DATA21_OUT |
+| IO5 | 11 | I/O/T | GPIO5,LP_GPIO5,LP_UART_CTSN,LP_SPI_Q,LP_PROBE_TOP_OUT5,LCD_DATA22_OUT |
+| IO6 | 12 | I/O/T | GPIO6,LP_GPIO6,TOUCH_CH0,LP_UART_TXD,LP_I2C_SCL,LP_PROBE_TOP_OUT6 |
+| IO7 | 13 | I/O/T | GPIO7,LP_GPIO7,TOUCH_CH1,LP_UART_RXD,LP_I2C_SDA,LP_PROBE_TOP_OUT7,LCD_DATA23_OUT |
+| IO8 | 14 | I/O/T | GPIO8,TOUCH_CH2,GMAC_PHY_TXD0,LCD_DATA0_OUT |
+| IO9 | 15 | I/O/T | GPIO9,TOUCH_CH3,GMAC_PHY_TXD1,LCD_DATA1_OUT,SPI2_HOLD |
+| IO10 | 16 | I/O/T | GPIO10,TOUCH_CH4,GMAC_PHY_TXD2,LCD_DATA2_OUT,SPI2_CS |
+| IO11 | 17 | I/O/T | GPIO11,TOUCH_CH5,GMAC_PHY_TXD3,LCD_DATA3_OUT,SPI2_D |
+| IO12 | 18 | I/O/T | GPIO12,TOUCH_CH6,GMAC_PHY_TXEN,LCD_DATA4_OUT,SPI2_CK |
+| IO13 | 19 | I/O/T | GPIO13,TOUCH_CH7,GMAC_RMII_CLK,LCD_DATA5_OUT,SPI2_Q |
+| IO14 | 20 | I/O/T | GPIO14,TOUCH_CH8,GMAC_RX_CLK,LCD_DATA6_OUT,SPI2_WP |
+| IO15 | 21 | I/O/T | GPIO15,TOUCH_CH9,GMAC_PHY_RXDV,LCD_DATA7_OUT,SPI2_IO4 |
+| IO16 | 22 | I/O/T | GPIO16,TOUCH_CH10,GMAC_PHY_RXD3,LCD_DATA8_OUT,SPI2_IO5 |
+| IO17 | 23 | I/O/T | GPIO17,TOUCH_CH11,GMAC_PHY_RXD2,LCD_DATA9_OUT,SPI2_IO6 |
+| IO18 | 24 | I/O/T | GPIO18,TOUCH_CH12,GMAC_PHY_RXD1,LCD_DATA10_OUT,SPI2_IO7 |
+| IO19 | 25 | I/O/T | GPIO19,TOUCH_CH13,GMAC_PHY_RXD0,LCD_DATA11_OUT,SPI2_DQS |
+| SD_D0 | 27 | I/O/T | SDIO_DATA0,GPIO20,SPI2_CK |
+| SD_D1 | 28 | I/O/T | SDIO_DATA1,GPIO21,SPI2_D |
+| SD_D2 | 29 | I/O/T | SDIO_DATA2,GPIO22,SPI2_Q |
+| SD_D3 | 30 | I/O/T | SDIO_DATA3,GPIO23,SPI2_CS |
+| SD_CLK | 31 | I/O/T | SDIO_CLK,GPIO24,SPI2_HOLD |
+| SD_CMD | 32 | I/O/T | SDIO_CMD,GPIO25,SPI2_WP |
+| NC | 33~39 | — | 空脚 |
+| USB_DP | 40 | I/O/T | USB_DP |
+| USB_DM | 41 | I/O/T | USB_DM |
+| IO33 | 42 | I/O/T | GPIO33,USB1P1_N0,LCD_DATA12_OUT |
+| IO34 | 43 | I/O/T | GPIO34,USB1P1_P0,LCD_DATA13_OUT |
+| IO35 | 44 | I/O/T | GPIO35,REF_GMAC_CLK,LCD_DATA14_OUT,SD2_CDATA0 |
+| IO36 | 45 | I/O/T | GPIO36,LCD_DATA15_OUT,SD2_CDATA1 |
+| IO37 | 46 | I/O/T | GPIO37,LCD_DATA16_OUT,SD2_CDATA2,PAD_COMP0 |
+| IO38 | 49 | I/O/T | GPIO38,LCD_DATA17_OUT,SD2_CDATA3,PAD_COMP1 |
+| IO39 | 50 | I/O/T | GPIO39,LCD_DATA18_OUT,SD2_CCLK,PAD_COMP2 |
+| IO40 | 51 | I/O/T | GPIO40,LCD_PCLK,SD2_CCMD,PAD_COMP3 |
+| IO42 | 52 | I/O/T | GPIO42,ADC1_CH0_N |
+| IO43 | 53 | I/O/T | GPIO43,ADC1_CH0_P,LCD_H_ENABLE |
+| IO44 | 54 | I/O/T | GPIO44,ADC1_CH1_N,LCD_H_SYNC |
+| IO45 | 55 | I/O/T | GPIO45,ADC1_CH1_P,LCD_V_SYNC |
+| IO46 | 56 | I/O/T | GPIO46,ADC1_CH2_N,CAM_DATA0_IN |
+| IO47 | 57 | I/O/T | GPIO47,ADC1_CH2_P,CAM_DATA1_IN |
+| IO48 | 58 | I/O/T | GPIO48,ADC1_CH3_N,CAM_DATA2_IN |
+| IO49 | 59 | I/O/T | GPIO49,ADC1_CH3_P,CAM_DATA3_IN |
+| IO50 | 60 | I/O/T | GPIO50,ADC2_CH0_N,CAM_DATA4_IN |
+| IO51 | 61 | I/O/T | GPIO51,ADC2_CH0_P,CAM_DATA5_IN |
+| IO52 | 62 | I/O/T | GPIO52,ADC2_CH1_N,CAM_DATA6_IN,SPI2_CS |
+| IO53 | 63 | I/O/T | GPIO53,ADC2_CH1_P,CAM_DATA7_IN,SPI2_CK |
+| IO54 | 64 | I/O/T | MTDO,GPIO54,ADC2_CH2_N,CAM_PCLK,SPI2_D |
+| IO55 | 65 | I/O/T | MTCK,GPIO55,ADC2_CH2_P,CAM_XCLK,SPI2_Q |
+| IO56 | 66 | I/O/T | MTDI,GPIO56,ADC2_CH3_N,CAM_V_SYNC,SPI2_HOLD |
+| IO57 | 67 | I/O/T | MTMS,GPIO57,ADC2_CH3_P,CAM_H_SYNC,SPI2_WP |
+| TX0 | 68 | I/O/T | UART0_TXD,GPIO58 |
+| RX0 | 69 | I/O/T | UART0_RXD,GPIO59 |
+| IO60 | 70 | I/O/T | GPIO60 |
+| IO61 | 71 | I/O/T | GPIO61 |
+| NC | 91 | — | 空脚 |
+
+**由此表核实/修正的几处**（对照 2.4.2b / 2.6）：
+- 模块序号 58 = **IO48**、59 = **IO49**（2.6 #3 的"58/59 标注重复"即此二脚：TP_RST 与状态 LED，与 bsp_config.h 一致）
+- **MCLK：本板未接，采用 BCLK PIN 模式**（2026-08-27 官方驱动核实，见 2.6 #1 / 6.2）：ES8389 内部时钟从 I2S BCLK 派生，无需外部 MCLK；pin4 与 DACDAT 短接共接 I2S_DSDIN 为该模式省料设计。IO33/34 保持空闲（备用）
+
+#### 2.4.2d 屏幕参数与驱动指南（NV3052CGRB / ZJY400-8532ACT / FT6336U，2026-08-27 归档）
+
+##### 屏幕核心参数（ZJY400-8532ACT，郑州中景园）
+
+| 项目 | 规格 |
+|------|------|
+| 尺寸 | 4.0 英寸，**720 (RGB) × 720 方形屏**（⚠️ 非 480×854，BSP 默认值需改） |
+| 像素排列 | RGB 垂直条纹 |
+| 显示模式 | 常黑（Normally Black），全视角 |
+| 色彩 | **262K（18-bit RGB666）** |
+| 驱动 IC | **NV3052CGRB**（RAMless，无 GRAM —— 必须持续 RGB 数据流） |
+| 触摸 IC | **FT6336U**（电容触摸，I2C 从机地址 **0x38**，单点/两点） |
+| 接口 | 并行 RGB 18-bit + 触摸 I2C |
+| 背光 | 8 LED（4 串 2 并），VF≈12.8 V，IF≈40 mA，**需外部升压驱动**（本板 MP3302，BL_EN=IO54 PWM 调光） |
+| 工作电压 VCI | 2.5~3.6 V（Typ. 3.3 V） |
+| 连接器 | 0.5 mm 40pin ZIF（AFC24-S40FIA-00） |
+
+##### 模组引脚（40pin FPC）与主控连接
+
+| 模组引脚 | 名称 | 功能 | 本板连接 |
+|:---:|------|------|---------|
+| 1 | LED_A | 背光阳极 | MP3302 升压正极（12.8 V） |
+| 2,3 | LED_K1,K2 | 背光阴极 | 升压开关脚（PWM 调光） |
+| 4,34,40 | GND | 地 | 主地 |
+| 5,39 | VCI / TP_VCI | 逻辑/触摸电源 | 3.3 V |
+| 6 | RESET | 屏复位（低有效） | IO43（LCD_RESET） |
+| 12 | PCLK | 像素时钟 | IO40 |
+| 13 | DE | 数据使能（RGB 模式必需） | IO42 |
+| 14 | VSYNC | 帧同步 | IO45 |
+| 15 | HSYNC | 行同步 | IO44 |
+| 16~33 | DB0~DB17 | 18-bit RGB（DB0-5 蓝 / DB6-11 绿 / DB12-17 红） | IO7~19 / IO35~39 |
+| 35 | TP_INT | 触摸中断（下降沿） | IO2 |
+| 36,37 | TP_SDA/TP_SCL | 触摸 I2C | IO46 / IO47 |
+| 38 | TP_RESET | 触摸复位 | IO48 |
+| 7~11 | IM1/IMO/SDA/SCK/CS | ⚠️ **未连接**（模组硬连线 RGB 18-bit 模式） | **无**（见下方 SPI 初始化说明） |
+
+##### 上电/初始化要点
+
+1. **上电时序**：VCI 上电 → RESET 低 ≥10 µs → 拉高等待 5 ms → 显示数据流
+2. **初始化命令（MIPI-DBI 类）**：`0x11` Sleep Out（等 120 ms）→ `0x36` 方向 → `0x3A=0x66`（18-bit）→ `0x29` Display ON
+   - ⚠️ **初始化命令走 SPI（CS/SCL/SDI = 模组引脚 9/10/8?），本板未接**（引脚 7~11 悬空）→ **依赖模组 OTP 出厂配置**（多数中景园模组出厂已烧录，上电即显示）；若 OTP 未配置需飞线 SPI 补初始化
+3. **RGB 时序**：PCLK 周期 ≥28 ns（≤35.7 MHz）；720×720@60Hz 典型 **~31 MHz**；PCLK 上升沿采样、VS/HS/DE 高有效（极性不符可经 RGB 控制寄存器调整）
+4. **HSYNC/VSYNC 计算**：HSYNC = PCLK/(720+H_Blank)，VSYNC = HSYNC/(720+V_Blank)（H_Blank≈100、V_Blank≈30 为估算值，精确值以规格书时序为准）
+
+##### 触摸（FT6336U）控制参数
+
+| 项 | 值 |
+|----|-----|
+| I2C 地址 | **0x38**（7-bit） |
+| 中断 | TP_INT 下降沿（IO2，主控外部中断） |
+| 复位 | TP_RESET 拉高等待 ≥5 ms 后可用（IO48） |
+| 触点数 | 单点/两点（非多点） |
+| 驱动 | 标准 FT6x36 代码可直接移植；BSP 按 I2C1 + 轮询/中断双模式 |
+
+##### 对本板 BSP 的影响（待改）
+
+- 分辨率：**480×854 → 720×720**（Kconfig `LERO_LCD_H_RES/V_RES`、帧缓冲 720×720×2B×2≈2.1 MB PSRAM ✓ 16 MB 充足）
+- PCLK：16 MHz → **~31 MHz**（Kconfig `LERO_LCD_PIXEL_CLOCK_HZ`）
+- 消隐期：按规格书时序调整（当前 Kconfig 默认 10/20/20/10/20/20 需核对）
+- 触摸：按 FT6336U 地址 0x38 探测（BSP 目前未知地址，需上板扫描）
+
+#### 2.4.2e LVGL 集成检查（2026-08-27，对照官方 S31 例程 `docs/ESP32_S31_20260711/`）
+
+> 官方 S31 方案：**esp_lvgl_adapter**（`espressif/esp_lvgl_adapter: ^0.5.0`，替代传统 esp_lvgl_port）+ RGB 面板 data_width=16/16bpp（Korvo 800×480 同为 16bit，与我们的 RGB565 方案一致）+ esp_lcd_touch 触摸。
+
+**✅ 已具备**：
+- `bsp_display`：esp_lcd RGB 面板 + 双缓冲（EXT_RAM）+ 背光 PWM + `get_handle/get_framebuffers/get_resolution` 接口（为 adapter 预留）
+- `bsp_touch`：I2C1 总线 + INT(IO2)/RST(IO48) + 地址扫描框架
+- 官方参考代码：`docs/ESP32_S31_20260711/examples/common_components/esp32_s31_korvo/`（display.h：rotation/tear_avoid/缓冲配置；bsp_touch_new：GT1151 模式，可改为 FT5x06）
+
+**❌ 待补齐**（✅ 2026-08-27 已实现，`components/ui/` + bsp 适配，待 CI 编译验证）：
+1. ✅ **组件依赖**（main/idf_component.yml）：`espressif/esp_lvgl_adapter: ^0.5.0`（传递 LVGL v9 + esp_lcd_touch + freetype 等）+ `espressif/esp_lcd_touch_ft5x06: ^1.1.1`（**FT6336U 属 FT5x06 协议族，0x38 兼容**；依赖 esp_lcd_touch ^1.2.0）
+2. ✅ **分辨率/时序**（bsp Kconfig）：720×720、PCLK 31 MHz、消隐 H:1/79/20、V:1/24/5（H_Blank=100、V_Blank=30，按规格书估算，上板核对）
+3. ✅ **LVGL 注册代码**（`components/ui/`，参照 korvo 组件）：
+   - `esp_lv_adapter_register_display`：720×720、RGB565、`TEAR_AVOID_MODE_DOUBLE_FULL`（直接用 panel 2 个 PSRAM 帧缓冲，无需额外分配）
+   - `esp_lv_adapter_register_touch`：ft5x06（0x38、INT、RST）
+   - LVGL 任务 + 锁（adapter 提供）
+4. ✅ **触摸接入**：`bsp_touch` 改接 `esp_lcd_touch_ft5x06`（I2C1 400 kHz、IO2 中断、IO48 复位；bsp_i2c 新增 `get_bus1`）
+5. ✅ **颜色**：`CONFIG_LV_COLOR_DEPTH_16`（RGB565）+ `CONFIG_LV_MEM_CUSTOM`（IDF heap，PSRAM 可用）
+6. ✅ **上电 demo**：`CONFIG_LV_USE_DEMO_BENCHMARK` + `ui_init()` 启动官方 benchmark demo（**右上角显示 FPS**）；`CONFIG_LERO_UI_DEMO_BENCHMARK` 可关
+
+**⚠️ 待确认**：消隐期精确值（规格书时序表）；方形屏旋转需求低；esp_lvgl_adapter 与 esp_codec_dev 2.0.0-beta3 无依赖交集（adapter 只依赖 lvgl/esp_lcd），无版本冲突预期。
+
+
 #### 2.4.3 触摸屏（电容触摸，I2C）
+
+> **触摸 IC：FT6336U**（地址 0x38，单点/两点，中断下降沿；控制参数见 **2.4.2d**）。当前 BSP 按 I2C1 + 中断 IO2 轮询/中断双模式设计。
 
 | 信号 | 网络名 | 模块引脚 | GPIO |
 |------|--------|:--------:|:----:|
@@ -152,13 +347,15 @@
 
 #### 2.4.5 按键
 
+> ✅ 2026-08-27 用户确认：**SW3~5 = IO55/56/57，外部上拉（10k）**，按下为低电平；BSP 已开内部上拉（与外部并联增强）并匹配 `BSP_BTN_ACTIVE_LEVEL=0`（bsp_buttons.c）。
+
 | 按键 | 网络名 | 模块引脚 | GPIO | 说明 |
 |------|--------|:--------:|:----:|------|
 | SW1 | EN | 5 | EN | 复位键 |
 | SW2 | BOOT | 71 | **IO61** | 引导模式键（非传统 IO0，见 2.6） |
-| SW3 | IO55 | 65 | **IO55** | 功能键 1（10k 上拉 + 100nF 消抖） |
-| SW4 | IO56 | 66 | **IO56** | 功能键 2 |
-| SW5 | IO57 | 67 | **IO57** | 功能键 3 |
+| SW3 | IO55 | 65 | **IO55** | 功能键 1（10k 上拉 + 100nF 消抖，按下低） |
+| SW4 | IO56 | 66 | **IO56** | 功能键 2（10k 上拉，按下低） |
+| SW5 | IO57 | 67 | **IO57** | 功能键 3（10k 上拉，按下低） |
 
 #### 2.4.6 USB
 
@@ -180,11 +377,31 @@
 
 | 信号 | 模块引脚 | GPIO | 说明 |
 |------|:--------:|:----:|------|
-| 串口 TX / RX | 68 / 69 | TX0 / RX0 | CN2 调试口 |
+| 串口 TX / RX | 68 / 69 | **GPIO58 / GPIO59**（U0TXD/U0RXD） | CN2 调试口（HC-1.25-4PLT：3V3/GND/TX0/RX0）。注：68/69 为 **S31-WROOM-3 模块 pad 号**（非 GPIO 号），对应芯片 UART0 IOMUX 默认 GPIO58/59（esp-idf `soc/esp32s31/include/soc/uart_pins.h`） |
 | IO60 | 70 | IO60 | 悬空（备用/测试点） |
 | IO36 / IO37 | 45 / 46 | IO36 / IO37 | **未连接，可作扩展**（如红外发射等） |
 
 > **I2C 总线划分**：I2C0（SDA=IO0 / SCL=IO1）→ ES8389 + QMI8658A；I2C1（SDA=IO46 / SCL=IO47）→ 触摸屏。两条总线独立。
+
+#### 2.4.9 驱动 IO 总表（2026-08-27 最终确认版）
+
+> 驱动分层：**BSP（components/bsp）是唯一接触硬件的层** —— 引脚/总线/时序全部在 `bsp_config.h` 与 bsp_*.c 内，驱动库（esp_codec_dev / esp_lcd / esp_lcd_touch）只做协议；上层（player/voice/ui/diag）只经 BSP 接口访问（耦合规则见 3.1）。
+
+| 外设 | 驱动方案（参考官方） | 引脚 / 总线 | 关键参数 | 调试入口 |
+|------|---------------------|-------------|----------|----------|
+| **ES8389 音频** | `esp_codec_dev` 2.x（espressif/esp-audio-dev 官方 es8389.c） | I2C0（IO0/IO1，0x20）；I2S：SCLK=IO3、LRCK=IO4、SDOUT=IO5、DSDIN=IO6；**无 MCLK（BCLK PIN 模式）** | 48k/16bit/2ch；PA=IO52（bsp_amplifier） | console `codec`（寄存器 dump）、`periph` |
+| **QMI8658A IMU** | 自研轮询驱动（寄存器映射按 QMI8658A 手册，参考 esp-bsp 风格） | I2C0（0x6A/0x68 双地址探测） | accel ±4g/1kHz、gyro ±2048dps/1kHz | console `imu` |
+| **FT6336U 触摸** | `esp_lcd_touch_ft5x06` + `esp_lcd_touch`（esp-bsp 官方） | I2C1（IO46/IO47，0x38）；INT=IO2（下降沿）、RST=IO48（低有效） | 400 kHz；720×720 坐标 | console `touch` |
+| **RGB LCD** | `esp_lcd` RGB 面板（esp-idf 官方，16-bit RGB565） | DB0~12=IO7~19、DB13~17=IO35~39、PCLK=IO40、DE=IO42、RESET=IO43、HS=IO44、VS=IO45、BL=IO54 | 720×720、PCLK 31 MHz、消隐 1/79/20、1/24/5；NV3052C（OTP，无 SPI 初始化） | `periph` + LVGL benchmark FPS |
+| **MicroSD** | `sdmmc` 4-bit（esp-idf 官方） | 模块专用 SDIO 引脚（D0~3/CLK/CMD） | — | console `sd` |
+| **storage 分区** | `spiffs`（esp-idf 官方） | — | 首启自动格式化 | `sd` |
+| **按键 SW3~5** | `gpio` 轮询 + esp_timer 消抖（自研，官方风格） | IO55/56/57（外部 10k 上拉，按下低） | 短按 ≥50ms / 长按 3s / 超长按 10s | `periph` |
+| **电源监控** | `esp_adc` oneshot（esp-idf 官方） | BAT=IO50（ADC2_CH0）、BUS=IO51（ADC2_CH1） | `ADC_ATTEN_DB_0`（S31 单档） | console `power` |
+| **状态 LED** | `gpio` 输出（低电平点亮） | IO49 | — | `power` |
+| **USB 使能** | `gpio` 输出 | IO53 | 负载开关 | `periph` |
+| **UART0 调试** | `esp_console` + ESP_LOG（esp-idf 官方） | TX=IO58、RX=IO59（CN2） | 115200 | 全部 console 命令 |
+
+**空闲引脚**：IO33 / IO34 / IO60（备用扩展）。
 
 ### 2.5 硬件设计注意事项
 
@@ -200,13 +417,13 @@
 
 | # | 发现 | 影响 / 行动 |
 |---|------|-------------|
-| 1 | ⚠️ **I2S_MCLK 未连接到主控**：该网络只存在于音频页（接 ES8389 MCLK 引脚、C57 22pF、R54 100k），未接到模块任何 GPIO | ES8389 需要 MCLK 才能工作。需补连：选一个空闲 GPIO 输出 MCLK（如 IO36/IO37），或确认模块是否内置 MCLK 输出 |
-| 2 | ⚠️ **SD_DET 未接入主控**：卡检测信号只在卡座端有网络名，未连到模块 | 卡检测功能不可用。如需热插拔检测，补连 IO36/IO37 之一 |
-| 3 | ⚠️ **模块引脚 58/59 标注重复**：两脚均标 "IO49"（疑为 IO48/IO49），触摸复位 TP_RST 与指示灯 DE 分别接此两脚 | 与数据手册引脚图核对后修正符号；BSP 中按核实结果配置 |
+| 1 | ⚠️ **I2S_MCLK 未连接到主控**：该网络只存在于音频页（接 ES8389 MCLK 引脚、C57 22pF、R54 100k），未接到模块任何 GPIO | ✅ **无需补接**（2026-08-27 官方驱动核实）：ES8389 支持 **BCLK PIN 模式**（`no_mclk=true` → REG0x02[7:6]=01，时钟从 I2S BCLK 派生，驱动按 BCLK=fs×bits×2 查系数表）。原理图 **pin4(MCLK/DMIC_SCL/TDMIN) 与 DACDAT 短接共接 I2S_DSDIN** —— 正是 BCLK 模式省 MCLK 的设计，pin4 不参与时钟无影响。BSP 按 `no_mclk=true` 配置，**音频可正常工作，无需改版** |
+| 2 | ⚠️ **SD_DET 未接入主控**：卡检测信号只在卡座端有网络名，未连到模块 | 卡检测功能不可用。如需热插拔检测，补连 IO36/IO37 之一（当前 IO36/37 已给 DB14/DB15，需另选） |
+| 3 | ⚠️ **模块引脚 58/59 标注重复**：两脚均标 "IO49"（疑为 IO48/IO49），触摸复位 TP_RST 与指示灯 DE 分别接此两脚 | **已核实**（2026-08-27 管脚定义表）：序号 58=**IO48**（ADC1_CH3_N/CAM_DATA2_IN）、59=**IO49**（ADC1_CH3_P/CAM_DATA3_IN）→ TP_RST=IO48 ✓、状态 LED=IO49 ✓，与 bsp_config.h 一致 |
 | 4 | **BOOT 按键接 IO61 而非 IO0**（IO0 被用作 SDA） | S31 引导 strapping 引脚以数据手册为准；确认 IO61 是否可触发下载模式，否则下载模式需另留入口 |
-| 5 | IO36 / IO37、IO60 未使用 | 可作为 MCLK / SD_DET / 红外发射等扩展资源 |
-| 6 | ⚠️ **IMU 中断未接主控**：QMI8658A 的 INT1/INT2 引脚无网络（仅 SDA/SCL/3V3/GND） | IMU 只能轮询读取，无法中断唤醒 / 手势中断；BSP 按轮询设计（后续要手势唤醒需改版补连） |
-| 7 | ⚠️ **IMU 地址脚 SA0 悬空**：SDO/SA0 未接，地址依赖内部默认（原理图标注 0x6A） | BSP 初始化时先探测 0x6A / 0x68 两个地址再锁定 |
+| 5 | IO36 / IO37（现 DB14/15）、IO60 未使用 | 可作为 SD_DET / 红外发射等扩展资源（MCLK 无需 —— BCLK PIN 模式） |
+| 6 | ⚠️ **IMU 中断未接主控**：QMI8658A 的 INT1/INT2 引脚无网络（仅 SDA/SCL/3V3/GND） | IMU 只能轮询读取，无法中断唤醒 / 手势中断；**BSP 轮询驱动已实现**（2026-08-27：accel ±4g / gyro ±2048dps / 1 kHz，console `imu` 命令验证；手势唤醒需改版补连） |
+| 7 | ⚠️ **IMU 地址脚 SA0 悬空**：SDO/SA0 未接，地址依赖内部默认（原理图标注 0x6A） | **已实现**：初始化先探测 0x6A / 0x68 再锁定（bsp_imu.c） |
 | 8 | ⚠️ **ADC 通道映射与衰减（上板实测确认）**：GPIO50/51 属 **ADC2**（CH0/CH1；ADC1 仅 GPIO42~49）；S31 为新一代 SAR ADC（17-bit、差分），`SOC_ADC_ATTEN_NUM=1` 仅 `ADC_ATTEN_DB_0` 合法（`DB_11` 编译期不存在、`DB_12` 运行时报 invalid attenuation，官方 oneshot 示例同此处理） | 已按 ADC2 + DB_0 修正；ADC2 与 Wi-Fi 活跃时的共存性需上板实测（若读数异常改用 ADC1 引脚或连续采样） |
 
 ---
@@ -220,8 +437,9 @@
 | **核心框架** | **ESP-IDF v6.1+**（target: `esp32s31`） | esp32s31 支持的最低版本线（**v6.0 全系无 S31 工具链**） |
 | **音频框架** | **ESP-GMF**（`espressif/esp-gmf`）+ **esp_codec_dev** | S31 官方多媒体框架；**ES8389 已被 esp_codec_dev ≥ v1.3.6 官方支持（播放+录音）** |
 | **蓝牙音频** | ESP-BLE-AUDIO / BT Classic | S31 原生支持 **BLE Audio（LC3）** 与蓝牙经典 A2DP |
-| **显示框架** | LVGL v9 + **esp_lvgl_port** | 乐鑫官方适配组件（注意：不是"esp_lvgl_adapter"） |
+| **显示框架** | LVGL v9 + **esp_lvgl_adapter** | S31 官方适配组件（`espressif/esp_lvgl_adapter`，非传统 esp_lvgl_port；见 2.4.2e） |
 | **UI 设计工具** | SquareLine Studio | 拖拽生成 LVGL 代码，免费版支持 LVGL v9 |
+| **驱动分层（耦合规则）** | **BSP 唯一接触硬件**：引脚/总线/时序收敛在 `components/bsp`（`bsp_config.h` + bsp_*.c）；驱动库（esp_codec_dev / esp_lcd / esp_lcd_touch / esp_adc）只做协议，经 BSP 接口暴露给上层（player/voice/ui/diag）；换板只改 BSP（见 2.4.9） |
 | **配网方案** | SmartConfig（ESP-TOUCH v2）+ 微信小程序 | 一键配网；softAP 兜底 |
 | **智能家居** | **esp-mqtt**（Home Assistant 等）+ **ESP-Matter** | MQTT 为主力通道，Matter 接入主流生态（见第 7 章） |
 | **OTA 升级** | esp_ghota（HTTP）+ SD 卡本地升级 | 双通道，共用 ota_service 组件 |
@@ -267,7 +485,7 @@ Lero-Voice/                    # 仓库根 = ESP-IDF 工程（target: esp32s31�
 components/bsp/
 ├── bsp_config.h         # ★ 板级配置：GPIO 映射 / I2C 地址 / I2S 参数 / 静态缓冲区大小
 ├── bsp.h / bsp.c        # bsp_init()：按序初始化全部外设；bsp_deinit()
-├── bsp_display.c/.h     # LCD（esp_lcd RGB 并口，IO7~19/33~35/38~45）+ 背光 PWM（BL_EN=IO54）
+├── bsp_display.c/.h     # LCD（esp_lcd RGB 并口，DB=IO7~19/35~39，PCLK/DE/RESET/HS/VS=40/42/43/44/45）+ 背光 PWM（BL_EN=IO54）
 ├── bsp_touch.c/.h       # 电容触摸（esp_lcd_touch → LVGL 输入；I2C1=IO46/47，INT=IO2）
 ├── bsp_codec.c/.h       # ES8389 播放/录音（esp_codec_dev；I2S=IO3~6，I2C0=IO0/1）
 ├── bsp_amplifier.c/.h   # NS4150B 使能/静音（PA_CTRL=IO52）
@@ -296,7 +514,7 @@ components/bsp/
 
 1. `bsp_config.h` + `bsp_init()` 骨架 + 电源/按键 + 串口日志（点亮最小系统）
 2. `bsp_display` + `bsp_touch`（跑通 LVGL 画面与触摸）
-3. `bsp_codec` + `bsp_amplifier`（立体声播放 → 双麦录音；注意先补 MCLK 连接，见 2.6）
+3. `bsp_codec` + `bsp_amplifier`（立体声播放 → 双麦录音；**BCLK PIN 模式无需 MCLK**，见 2.6 #1）
 4. `bsp_sdcard` + `bsp_storage`（挂载/读写，为 OTA 与本地音乐铺路）
 5. `bsp_imu`（轮询模式，见 2.6）/ `bsp_power` / `bsp_usb`（外设补齐）
 
@@ -561,6 +779,8 @@ flowchart LR
 ### 3.8 调试与诊断模块（diag）
 
 > 目标：统一输出调试信息，问题排查一站式 —— 串口控制台、分级日志与落盘、屏幕诊断页、崩溃转储（coredump）、故障指示灯。
+>
+> 📖 **上板实操**：启动日志序列、命令速查、各驱动调试与故障排查表、推荐调试顺序见 [DEBUG.md](DEBUG.md)。
 
 #### 3.8.1 信息通道
 
@@ -608,6 +828,12 @@ components/diag/
 | `rec [秒]` | **录音 N 秒（默认 30）→ WAV（`/sdcard/record/rec.wav`）→ 自动播放**（见 6.3） |
 | `rec-stop` | 提前结束录音（保留已录 WAV） |
 | `voice` / `voice-listen` / `voice-stop` | 语音状态 / 开始聆听 / 停止聆听 |
+| `imu` | 读 QMI8658A：accel(mg)/gyro(mdps)/temp(°C) —— 上板验证 IMU |
+| `i2c-scan` | 扫描 I2C0（codec/imu）与 I2C1（touch）全部 7-bit 地址，列出 ACK 设备 —— 排查总线/地址/上拉 |
+| `reg <bus0\|bus1> <addr7> <reg>` | 通用 I2C 单寄存器读取（十六进制）—— 驱动调试万能工具 |
+| `codec` | ES8389 关键寄存器组 dump（时钟/ADC/DAC/模拟）—— 排查 no-ACK 与时钟源（REG0x02[7:6]：00=MCLK PIN / 01=BCLK PIN） |
+| `power` | 电池/总线电压、充电状态、电量百分比 —— 验证 ADC2 采样 |
+| `touch` | FT6336U 状态 + 实时坐标（按下显示 x/y）—— 验证触摸链路 |
 | `help` | 命令列表 |
 
 #### 3.8.4 日志规则（补充 3.4 规则 11）
@@ -743,7 +969,7 @@ components/diag/
 
 - **LVGL v9** + **esp_lvgl_port**（乐鑫官方适配，支持 LVGL 8/9，ESP-IDF v4.4+）
 - **SquareLine Studio** 可视化设计，导出 C 代码接入 `main/app/ui/`
-- 面板为 **RGB 并口（18-bit）**：DB0~17 = IO7~19 / IO33~35 / IO38~39，PCLK=IO40、DE=IO42、RESET=IO43、HS=IO44、VS=IO45（见 2.4.2），需要 `esp_lcd` RGB 面板驱动 + 全量/部分刷新缓冲（PSRAM 16 MB 充足）
+- 面板为 **RGB 并口（18-bit）**：DB0~17 = IO7~19 / IO35~39，PCLK=IO40、DE=IO42、RESET=IO43、HS=IO44、VS=IO45（见 2.4.2），需要 `esp_lcd` RGB 面板驱动 + 全量/部分刷新缓冲（PSRAM 16 MB 充足）
 - 背光由 MP3302 驱动，`BL_EN=IO54` 做 PWM 亮度调节与息屏省电
 - 触摸走 I2C1（TP_SDA=IO46 / TP_SCL=IO47 + INT=IO2 / RST=IO48），用 `esp_lcd_touch` 组件接入 LVGL 输入设备
 - IMU（QMI8658A，I2C0）可做**屏幕自动横竖屏旋转**与摇一摇唤醒
@@ -775,7 +1001,7 @@ I2C:  SDA(IO0)/SCL(IO1) → ES8389 控制 (0x20)，与 QMI8658A(0x6A) 共用总�
 1. AUD_3V3 独立 LDO 供电，AGND/DGND 单点连接
 2. I2S 等长走线，避免跨分割
 3. NS4150B：VCC 就近去耦（10 µF + 100 nF），输出 LC 靠近喇叭座
-4. ⚠️ **MCLK 待补连**（见 2.6）：ES8389 需 MCLK，原理图当前未接主控，BSP 阶段前必须修正
+4. ~~MCLK 补连~~ **已解决（BCLK PIN 模式）**：ES8389 内部时钟从 I2S BCLK 派生，无需外部 MCLK（见 2.6 #1 / 6.2）
 5. **回声消除（AEC）**：语音助手场景必须做 AEC —— 用 ESP-SR（若支持 S31）或参考 Korvo-1 的双麦方案；至少把播放参考信号接入处理链路
 6. 喇叭功率预算：3 W×2 连续播放时，评估电池（放电倍率）与散热
 
@@ -786,7 +1012,7 @@ I2C:  SDA(IO0)/SCL(IO1) → ES8389 控制 (0x20)，与 QMI8658A(0x6A) 共用总�
 - **API**：`player_play_file(path)` / `player_play_loop(path)`（FINISHED 自动重播，`stop` 终止）/ `player_play_url(url)`（HTTP(S) 下载到 SD 后循环播放，静态下载任务 + esp_http_client 流式落盘，文件名取 URL basename、无扩展名补 .mp3）/ `player_stop` / `player_pause` / `player_resume` / `player_set_volume` / `player_get_state` + 状态事件回调
 - **codec 生命周期**：收到 `MUSIC_INFO` 事件（采样率/声道/位深）→ `esp_codec_dev_open` → 功放使能；`STOPPED/FINISHED/ERROR` → 关 codec → 功放关闭（防爆音，3.3.1 #3）；循环模式跨曲保持打开
 - **控制入口**：diag console 命令 `play / play-loop / play-url / stop / pause / resume / vol / player`；后续接 UI 与语音意图
-- ⚠️ 出声前提：MCLK 接线（原理图修订 2.6 #1）+ ES8389 驱动上板实测（`es8389_codec_cfg_t` 子配置已按官方 esp-audio-dev 语义细化：`sys_cfg.is_master=false` 从模式、`no_mclk=false` 使用 MCLK、`adc_cfg` 模拟麦、`pa_cfg.pa_pin=-1` 交由 bsp_amplifier 防双控；I2S 双通道 TX+RX 支持录音）
+- ✅ **无需 MCLK**：ES8389 采用官方驱动的 **BCLK PIN 模式**（`no_mclk=true`，REG0x02[7:6]=01，时钟从 I2S BCLK 派生；驱动按 BCLK=fs×bits×2 查 coeff_div 系数表，16bit/2ch 时 BCLK=32×fs 与表匹配）。原理图 pin4(MCLK/TDMIN) 与 DACDAT 短接共接 I2S_DSDIN 为省 MCLK 设计，BCLK 模式下无影响。上板实测项：`es8389_codec_cfg_t` 子配置（`sys_cfg.is_master=false` 从模式、`no_mclk=true`、`adc_cfg` 模拟麦、`pa_cfg.pa_pin=-1` 交由 bsp_amplifier 防双控；I2S 双通道 TX+RX 支持录音）
 
 ### 6.3 录音 → WAV → 回放（已实现，`components/voice/`）
 
@@ -1171,7 +1397,7 @@ idf.py -p COM3 flash monitor
 |------|------|------|
 | **M0** | 硬件方案选型（ESP32-S31-WROOM-3-N16R16V + ES8389 + NS4150B×2） | ✅ |
 | **M1** | 原理图设计（嘉立创 EDA，2026-08-25 版） | ✅ |
-| **M1.5** | **原理图修订**（补 MCLK / SD_DET 连接、核对 IO48/49 标注，见 2.6） | ⏳ 建议先行 |
+| **M1.5** | **原理图修订**（SD_DET 连接、核对 IO48/49 标注等，见 2.6；MCLK 无需补 —— BCLK PIN 模式） | ⏳ 建议先行 |
 | **M2** | PCB Layout（含阻抗、天线净空、音频分区） | 🔄 进行中 |
 | **M3** | 工程骨架与代码规范落地（MISRA 基线、CI 静态检查、目录结构、**diag 基础：console/日志/复位原因**） | ⏳ 下一步 |
 | **M4** | **BSP 开发（先行）**：bsp_init 打通 → 显示+触摸 → 音频 → SD → IMU/电源 | ⏳ |
@@ -1206,7 +1432,7 @@ idf.py -p COM3 flash monitor
 | 19 | **SD 日志写入磨损/失败** | 缓冲 1 KB 批量写 + 环形覆盖（4×256 KB）；写失败降级为仅内存日志，不阻塞主流程（见 3.8.4） |
 | 10 | **Matter 认证与生态** | 商用需 CSA 认证（周期长）；米家等国内生态需认证，开源阶段先做 HA/Apple/Google 互操作；ESP-Matter 编译体积与 Flash 余量需实测 |
 | 11 | **MQTT 配置 UX 与安全** | broker 地址/账号下发流程要顺滑（配置页向导）；TLS 与凭据加密需在量产前完成 |
-| 12 | **原理图待修项** | MCLK / SD_DET 未接主控、引脚 58/59 标注重复、IMU 中断未接、SA0 悬空（见 2.6）—— 必须在 PCB 与 BSP 之前完成修订 |
+| 12 | **原理图待修项** | SD_DET 未接主控、引脚 58/59 标注重复、IMU 中断未接、SA0 悬空（见 2.6）—— 必须在 PCB 与 BSP 之前完成修订（MCLK 已由 BCLK PIN 模式解决） |
 | 13 | **IMU 中断不可用** | 手势唤醒/跌落检测只能轮询（50 ms 周期），功耗略增；如需中断能力改版补连 INT1/INT2（见 2.6 #6） |
 | 14 | **双核负载与栈预算** | 任务栈/优先级/核绑定为初始建议（3.5.1），M4 阶段用 `uxTaskGetStackHighWaterMark` 实测校准；Core 1 同时跑 audio+voice+ui，峰值负载需压测（播放+对话+刷屏并发） |
 
@@ -1221,6 +1447,8 @@ idf.py -p COM3 flash monitor
 | `docs/PLAN.md` | 本方案 |
 | `docs/esp32-s31-wroom-3_datasheet_cn.pdf` | ESP32-S31-WROOM-3 数据手册（中文）—— 引脚/电气/封装 |
 | `docs/SCH_Schematic1_1_2026-08-25.pdf` | 原理图（2026-08-25 版）—— 器件、网络与引脚映射依据 |
+| `docs/01-规格书与芯片手册/NV3052CGRB-Datasheet-V0.2.pdf` | **屏幕驱动 IC NV3052C 数据手册**（RGB 并口面板控制器）—— 上电时序/寄存器/接口定义（2026-08-27 归档） |
+| `docs/01-规格书与芯片手册/ZJY400-8532ACT.pdf` | **屏幕模组 ZJY400-8532ACT 规格书**（4.0" 854×480？）—— 分辨率/电气/背光/触摸接口（2026-08-27 归档，详见 2.4.2/2.4.3） |
 
 ### B. 芯片 / 模块
 

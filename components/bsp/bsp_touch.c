@@ -6,31 +6,30 @@
 
 /**
  * @file bsp_touch.c
- * @brief Touch controller scan + placeholder point API.
+ * @brief Capacitive touch controller FT6336U (I2C1: SDA=IO46 / SCL=IO47).
+ *
+ * FT6336U belongs to the FT5x06 protocol family (addr 0x38, single/two point),
+ * driven via espressif/esp_lcd_touch_ft5x06 + esp_lcd_touch (managed
+ * components). INT=IO2 (active low, falling edge), RST=IO48 (active low).
+ * See docs/PLAN.md 2.4.3 / 2.4.2d.
  */
 
 #include "esp_log.h"
 #include "driver/gpio.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_lcd_touch_ft5x06.h"
 #include "bsp_config.h"
 #include "bsp_i2c.h"
 #include "bsp_touch.h"
 
 #define TAG "bsp_touch"
 
-static const uint16_t s_candidate_addrs[] = {
-    0x15U,  /* CST816 */
-    0x38U,  /* FT6236 */
-    0x48U,  /* NS2009 / TSC2007 */
-    0x5AU,  /* GT911 (variant) */
-    0x5DU,  /* GT911 */
-    0x14U,  /* FT5x06 (variant) */
-};
-#define TOUCH_CANDIDATE_COUNT  (sizeof(s_candidate_addrs) / sizeof(s_candidate_addrs[0]))
+#define TOUCH_I2C_ADDR      0x38U   /* FT6336U（FT5x06 协议族） */
 
-static bool s_found;
-static uint16_t s_found_addr;
+static esp_lcd_touch_handle_t s_touch;
 
-esp_err_t bsp_touch_init(void)
+static esp_err_t s_gpio_init(void)
 {
     gpio_config_t int_cfg = {
         .pin_bit_mask = (1ULL << (uint64_t)BSP_TOUCH_INT_GPIO),
@@ -54,31 +53,65 @@ esp_err_t bsp_touch_init(void)
     if (err != ESP_OK) {
         return err;
     }
+    /* 复位脉冲：低≥1ms → 高，等待 5ms 后可用（PLAN 2.4.2d） */
+    (void)gpio_set_level(BSP_TOUCH_RST_GPIO, 0);
+    vTaskDelay(pdMS_TO_TICKS(2U));
     (void)gpio_set_level(BSP_TOUCH_RST_GPIO, 1);
-
-    for (size_t i = 0U; i < TOUCH_CANDIDATE_COUNT; i++) {
-        i2c_master_dev_handle_t dev = NULL;
-        err = bsp_i2c_add_device1(s_candidate_addrs[i], BSP_I2C1_FREQ_HZ, &dev);
-        if (err != ESP_OK) {
-            continue;
-        }
-        uint8_t probe = 0x00U;
-        err = i2c_master_transmit_receive(dev, &probe, 1U, &probe, 1U, 50);
-        if (err == ESP_OK) {
-            s_found = true;
-            s_found_addr = s_candidate_addrs[i];
-            ESP_LOGI(TAG, "touch candidate ACK at 0x%02X (panel model TBD, PLAN 11 #1)",
-                     (unsigned)s_candidate_addrs[i]);
-        }
-    }
-
-    if (!s_found) {
-        ESP_LOGW(TAG, "no touch controller answered on I2C1");
-        return ESP_ERR_NOT_FOUND;
-    }
-    ESP_LOGI(TAG, "touch ready (addr 0x%02X, read API pending panel id)",
-             (unsigned)s_found_addr);
+    vTaskDelay(pdMS_TO_TICKS(5U));
     return ESP_OK;
+}
+
+esp_err_t bsp_touch_init(void)
+{
+    if (s_touch != NULL) {
+        return ESP_OK;
+    }
+    esp_err_t err = s_gpio_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "touch gpio init failed: %s", esp_err_to_name(err));
+        return err;
+    }
+    i2c_master_bus_handle_t bus = NULL;
+    err = bsp_i2c_get_bus1(&bus);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "I2C1 unavailable (%s); touch disabled", esp_err_to_name(err));
+        return err;
+    }
+
+    esp_lcd_panel_io_handle_t io = NULL;
+    esp_lcd_panel_io_i2c_config_t io_cfg = ESP_LCD_TOUCH_IO_I2C_FT5x06_CONFIG();
+    io_cfg.scl_speed_hz = BSP_I2C1_FREQ_HZ;
+    err = esp_lcd_new_panel_io_i2c(bus, &io_cfg, &io);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "touch panel io failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    esp_lcd_touch_config_t touch_cfg = {
+        .x_max = CONFIG_LERO_LCD_H_RES,
+        .y_max = CONFIG_LERO_LCD_V_RES,
+        .rst_gpio_num = BSP_TOUCH_RST_GPIO,
+        .int_gpio_num = BSP_TOUCH_INT_GPIO,
+        .levels = {
+            .reset = 0,         /* 低电平复位 */
+            .interrupt = 0,     /* 低电平中断（下降沿） */
+        },
+        .flags = { 0 },         /* rotation 0：无 swap/mirror */
+    };
+    err = esp_lcd_touch_new_i2c_ft5x06(io, &touch_cfg, &s_touch);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "ft5x06(FT6336U) create failed: %s", esp_err_to_name(err));
+        return err;
+    }
+    ESP_LOGI(TAG, "touch ready: FT6336U @0x%02X (%ux%u)",
+             (unsigned)TOUCH_I2C_ADDR,
+             (unsigned)CONFIG_LERO_LCD_H_RES, (unsigned)CONFIG_LERO_LCD_V_RES);
+    return ESP_OK;
+}
+
+esp_lcd_touch_handle_t bsp_touch_get_handle(void)
+{
+    return s_touch;
 }
 
 esp_err_t bsp_touch_read_point(bsp_touch_point_t *point)
@@ -86,11 +119,23 @@ esp_err_t bsp_touch_read_point(bsp_touch_point_t *point)
     if (point == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
-    if (!s_found) {
+    if (s_touch == NULL) {
         return ESP_ERR_NOT_FOUND;
     }
-    /* TODO(M6): controller specific read after the panel is identified;
-     * integrate esp_lcd_touch (managed component) here. */
-    return ESP_ERR_NOT_SUPPORTED;
+    uint16_t x = 0U;
+    uint16_t y = 0U;
+    uint8_t count = 0U;
+    if (esp_lcd_touch_get_coordinates(s_touch, &x, &y, NULL, NULL, &count, 1U) != ESP_OK) {
+        return ESP_FAIL;
+    }
+    if (count == 0U) {
+        point->pressed = false;
+        point->x = 0U;
+        point->y = 0U;
+    } else {
+        point->pressed = true;
+        point->x = x;
+        point->y = y;
+    }
+    return ESP_OK;
 }
-
