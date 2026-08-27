@@ -16,7 +16,7 @@ jobs:
     name: Build (esp32s31)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # ---- 编译环境说明（docs/SETUP.md "CI 编译环境"）----
       # espressif/esp-idf-ci-action 是官方 espressif/idf Docker 镜像的封装：
@@ -27,7 +27,7 @@ jobs:
       #     由 actions/cache 跨运行持久化（首次全量，之后增量）
 
       - name: Cache ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .ccache
           key: ccache-${{ runner.os }}-${{ github.ref }}-${{ github.sha }}
@@ -115,7 +115,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true   # 参考性检查：MISRA 基线随实现推进逐步收紧
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install cppcheck
         run: sudo apt-get update && sudo apt-get install -y cppcheck
