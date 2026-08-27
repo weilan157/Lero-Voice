@@ -25,7 +25,8 @@ CONFIG_LOG_DEFAULT_LEVEL=3
 # Debug: UART console on CN2 + coredump partition (docs/PLAN.md 3.8.1)
 CONFIG_ESP_CONSOLE_UART_DEFAULT=y
 CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
-CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
+# 注：IDF master 已移除 ESP_COREDUMP_DATA_FORMAT_ELF 符号（格式选项被
+# 重构），删去该行避免 unknown kconfig symbol 警告，用 master 默认格式。
 
 # PSRAM: RGB frame buffers are statically allocated in PSRAM (docs/PLAN.md 3.3.1 #4)
 CONFIG_SPIRAM=y

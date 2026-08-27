@@ -57,6 +57,10 @@ jobs:
             PROJ=$(pwd)
             python -m pip install -U --quiet idf-component-manager
             # ---- 升级 IDF 到 master（fbcpy/color_convert 仅在 master）----
+            # 镜像预激活 6.1 环境：install.sh 检测 IDF_PYTHON_ENV_PATH 指向
+            # 6.1 python 环境会中止；旧工具链(esp-15.2.0_20251204)不满足
+            # master 要求(esp-16.1.0_20260609)。unset 后从干净 shell 重装。
+            unset IDF_PYTHON_ENV_PATH
             cd "$IDF_PATH"
             git fetch --depth=1 https://github.com/espressif/esp-idf.git master
             git checkout -f FETCH_HEAD
