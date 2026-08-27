@@ -110,7 +110,7 @@ esp_err_t bsp_display_init(void)
         return ESP_OK;
     }
 
-    esp_err_t err = s_backlight_init();          /* 背光默认关闭（PLAN 3.3.1 #2） */
+    esp_err_t err = s_backlight_init();          /* LEDC 通道就绪（duty=0） */
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "backlight init failed: %s", esp_err_to_name(err));
         return err;
@@ -164,8 +164,13 @@ esp_err_t bsp_display_init(void)
     }
     (void)esp_lcd_panel_disp_on_off(s_panel, true);
 
+    /* 上电即点亮背光（不依赖 ui_init/LVGL）：屏幕背光使能（BL_EN=IO54，
+     * MP3302 高有效 PWM 调光）。用户要求上电使能；LVGL 未就绪时屏幕为
+     * 黑屏（fb 全 0），便于确认背光电路与 panel 输出。 */
+    (void)bsp_display_backlight_set(100U);
+
     s_initialized = true;
-    ESP_LOGI(TAG, "display %ux%u ready (backlight off)",
+    ESP_LOGI(TAG, "display %ux%u ready (backlight on)",
              CONFIG_LERO_LCD_H_RES, CONFIG_LERO_LCD_V_RES);
     return ESP_OK;
 }

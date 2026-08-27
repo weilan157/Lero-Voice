@@ -16,7 +16,7 @@ Lero Voice 0.1.0 boot (IDF v6.1)
 │   ├─ [bsp_storage] storage mounted（首启自动格式化一次）
 │   ├─ [bsp_codec]   ES8389 present @0x20      ← 或 "no ACK" 降级（见 3.1）
 │   ├─ [bsp_imu]     QMI8658A found @0x6A / imu ready
-│   ├─ [bsp_display] display 720x720 ready (backlight off)
+│   ├─ [bsp_display] display 720x720 ready (backlight on)
 │   └─ [bsp_touch]   touch ready: FT6336U @0x38
 ├─ diag_init（console `lero>` + 日志落盘 + 快照）
 ├─ prov_init / ota_service_init / 按键事件接入

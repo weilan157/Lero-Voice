@@ -523,7 +523,7 @@ components/bsp/
 | # | 审查发现 | 修订 |
 |---|----------|------|
 | 1 | 原 BSP 缺 **storage 文件系统模块**：UI 资源、唤醒词、设备映射表、OTA 暂存都需要 storage 分区 | 新增 `bsp_storage`（SPIFFS 挂载/格式化/空间查询），开发顺序第 4 步 |
-| 2 | **背光时序**：`bsp_display_init` 若立即点亮背光，首帧渲染前会白屏 | 约定：背光默认关闭，UI 首帧渲染完成才 `bsp_display_backlight_set(>0)` |
+| 2 | **背光时序**：`bsp_display_init` 完成后立即点亮背光（用户要求上电使能，便于确认背光电路与面板输出） | 面板 `disp_on` 之后才 `bsp_display_backlight_set(100%)`；帧缓冲初始为全 0（黑屏），无白屏风险；UI 就绪前屏幕为黑屏，LVGL 失败不影响背光 |
 | 3 | **功放防爆音**：codec 与 amplifier 分离但无时序约定 | 约定：上电顺序 = codec 初始化 → PA 保持静音 → 首次播放前才 `bsp_amp_enable`；音源切换先 mute 再操作 |
 | 4 | **RGB 帧缓冲静态化**：无动态内存约束下，帧缓冲必须静态分配进 PSRAM | 用 `EXT_RAM_BSS_ATTR`（或链接段）声明静态数组，传入 `esp_lcd_rgb_panel_config_t.buf1/.buf2`；**S31 驱动不支持 18-bit，按 16-bit RGB565**：480×854×2B×2 帧 ≈ 1.6 MB 预算（上板实测后按面板色深细化） |
 | 5 | **充电状态盲区**：LGS5500EP 无 I2C，LED_BAT 由充电芯片直驱，固件读不到 | `bsp_power_get_charge_state()` 用 BUS_ADC 电压 + BAT 电压变化率推断；改版时可将 LED_BAT 兼接 GPIO 输入 |

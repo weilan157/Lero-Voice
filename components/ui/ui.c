@@ -91,7 +91,8 @@ esp_err_t ui_init(void)
         return err;
     }
 
-    /* 6. 背光点亮 + 官方 benchmark demo（显示 FPS） */
+    /* 6. 背光已在 bsp_display_init 点亮（上电即亮）；此处保持 100% 兜底，
+     *    再启动官方 benchmark demo（显示 FPS） */
     (void)bsp_display_backlight_set(100U);
 #if CONFIG_LERO_UI_DEMO_BENCHMARK
     if (esp_lv_adapter_lock(-1) == ESP_OK) {
