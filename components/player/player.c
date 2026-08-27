@@ -91,7 +91,9 @@ static void s_finish(player_state_t state)
         (void)esp_codec_dev_close(s_codec);
         s_codec_open = false;
     }
-    (void)bsp_amp_enable(false);    /* 播放结束关闭功放（防噪） */
+    /* 播放结束：先静音再关功放电源（防爆音），并复位状态机 */
+    (void)bsp_amp_mute(true);
+    (void)bsp_amp_enable(false);
     s_state = state;
     if (s_cb != NULL) {
         s_cb(state, NULL);
@@ -121,7 +123,10 @@ static int s_event(esp_asp_event_pkt_t *event, void *ctx)
             };
             if (esp_codec_dev_open(s_codec, &fs) == ESP_CODEC_DEV_OK) {
                 s_codec_open = true;
+                /* 功放：使能 + 解除静音（bsp_amp_init 默认 muted 防爆音，
+                 * 两个条件都满足 PA_CTRL(IO52) 才输出高电平） */
                 (void)bsp_amp_enable(true);
+                (void)bsp_amp_mute(false);
             } else {
                 ESP_LOGE(TAG, "codec open failed");
             }
