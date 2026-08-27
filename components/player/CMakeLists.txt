@@ -8,7 +8,7 @@ idf_component_register(
         esp_common
         esp_http_client
         esp_system
-        esp_vfs
+        vfs
         log
         freertos
 )
