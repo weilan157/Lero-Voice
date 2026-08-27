@@ -23,6 +23,7 @@
 #include <sys/stat.h>
 #include "sdkconfig.h"
 #include "esp_log.h"
+#include "esp_attr.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -135,9 +136,11 @@ voice_capture_result_t voice_capture_run(volatile bool *stop)
 /* path == NULL 时录到静态 PSRAM 缓冲（无 SD 卡可用），录完回填头并自动回放    */
 /* ------------------------------------------------------------------------- */
 
-/* 内存录音缓冲：静态 PSRAM BSS（CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY）
+/* 内存录音缓冲：显式放入 PSRAM 的 .ext_ram.bss 段（EXT_RAM_ATTR）。
+ * 注意：不能依赖 SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY 的自动放置——
+ * 大数组仍会被链接进内部 .dram0.bss 导致 sram_seg 溢出（实测 CI）。
  * 容量 = BUF_KB*1024 字节；@48k/2ch/16bit = 192000 B/s → 秒数上限见下 */
-static uint8_t s_rec_mem_buf[CONFIG_LERO_VOICE_RECORD_MEM_BUF_KB * 1024U];
+EXT_RAM_ATTR static uint8_t s_rec_mem_buf[CONFIG_LERO_VOICE_RECORD_MEM_BUF_KB * 1024U];
 static size_t s_rec_mem_size;               /* 有效数据长度（含 WAV 头） */
 
 #define VOICE_REC_MEM_BYTES_PER_SEC \
