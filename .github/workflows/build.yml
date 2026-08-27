@@ -42,11 +42,9 @@ jobs:
           # esp_async_fbcpy.h 但未声明组件依赖（编译报头文件缺失，
           # esp32.com 论坛已确认官方 factory_demo 同问题），
           # IDF 6.2+ 改用内置 esp_driver_dma 的 esp_async_color_convert.h。
-          # 截至 2026-08-27 IDF 6.2 尚未正式发布：Docker Hub 无
-          # release-v6.2 / v6.2 / v6.2-rc1 tag，故暂用滚动镜像 master
-          # （含 esp_async_color_convert）。⚠️ master 随上游更新，
-          # 6.2 正式发布后应改回固定 tag（如 v6.2）。
-          esp_idf_version: master
+          # 截至 2026-08-27 IDF 6.2 未正式发布：Docker Hub 无
+          # release-v6.2 / v6.2 / master tag，试 rc tag（v6.2-rc1）。
+          esp_idf_version: v6.2-rc1
           target: esp32s31
           path: '.'
           # 组件依赖：IDF v6.1 起组件管理器不再随 cmake 自动执行
