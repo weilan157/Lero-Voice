@@ -111,10 +111,9 @@ static esp_err_t s_i2s_init(void)
         ESP_LOGE(TAG, "i2s rx enable failed: %s", esp_err_to_name(err));
         return err;
     }
-    ESP_LOGI(TAG, "i2s ready (sclk=%d ws=%d dout=%d din=%d mclk=%d)",
+    ESP_LOGI(TAG, "i2s ready (sclk=%d ws=%d dout=%d din=%d, no mclk: BCLK PIN mode)",
              (int)BSP_I2S_SCLK_GPIO, (int)BSP_I2S_LRCK_GPIO,
-             (int)BSP_I2S_DSDIN_GPIO, (int)BSP_I2S_SDOUT_GPIO,
-             (int)BSP_I2S_MCLK_GPIO);
+             (int)BSP_I2S_DSDIN_GPIO, (int)BSP_I2S_SDOUT_GPIO);
     return ESP_OK;
 }
 

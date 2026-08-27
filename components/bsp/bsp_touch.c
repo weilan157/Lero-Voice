@@ -122,11 +122,16 @@ esp_err_t bsp_touch_read_point(bsp_touch_point_t *point)
     if (s_touch == NULL) {
         return ESP_ERR_NOT_FOUND;
     }
-    uint16_t x = 0U;
-    uint16_t y = 0U;
+    /* 新版 esp_lcd_touch API：先读控制器，再取坐标（旧 get_coordinates 已弃用） */
+    esp_err_t err = esp_lcd_touch_read_data(s_touch);
+    if (err != ESP_OK) {
+        return err;
+    }
+    esp_lcd_touch_point_data_t data = {0U};
     uint8_t count = 0U;
-    if (esp_lcd_touch_get_coordinates(s_touch, &x, &y, NULL, NULL, &count, 1U) != ESP_OK) {
-        return ESP_FAIL;
+    err = esp_lcd_touch_get_data(s_touch, &data, &count, 1U);
+    if (err != ESP_OK) {
+        return err;
     }
     if (count == 0U) {
         point->pressed = false;
@@ -134,8 +139,8 @@ esp_err_t bsp_touch_read_point(bsp_touch_point_t *point)
         point->y = 0U;
     } else {
         point->pressed = true;
-        point->x = x;
-        point->y = y;
+        point->x = data.x;
+        point->y = data.y;
     }
     return ESP_OK;
 }
