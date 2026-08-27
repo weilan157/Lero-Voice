@@ -152,13 +152,17 @@ Lero-Voice/            # 仓库根 = ESP-IDF 工程（target: esp32s31）
 
 ```
 play audio/example.mp3    # 开始播放（也支持绝对路径 /sdcard/audio/example.mp3）
+play-loop audio/example.mp3  # 循环播放（stop 终止）
+play-url https://.../song.mp3  # 下载歌曲到 SD 后一直循环播放
 pause / resume            # 暂停 / 继续
 stop                      # 停止
 vol 80                    # 音量 0-100
 player                    # 查询播放状态
+rec [秒]                  # 录音 N 秒（默认 30）→ WAV → 自动播放
+rec-stop                  # 提前结束录音
 ```
 
-> 播放管线：SD 文件 → ESP-GMF 解码（esp_audio_simple_player）→ PCM → ES8389（esp_codec_dev，I2S 主模式）。⚠️ 当前原理图 MCLK 未接线（见 PLAN 2.6 #1），**音频出声音需先完成原理图修订**。
+> 播放管线：SD 文件 → ESP-GMF 解码（esp_audio_simple_player）→ PCM → ES8389（esp_codec_dev，I2S 主模式）。录音管线：ES8389 ADC → I2S RX → WAV（/sdcard/record/rec.wav）。⚠️ 当前原理图 MCLK 未接线（见 PLAN 2.6 #1），**音频出声音需先完成原理图修订**。
 
 ## 开发约定
 

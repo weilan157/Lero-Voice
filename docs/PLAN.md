@@ -599,6 +599,15 @@ components/diag/
 | `log` | 运行时调整日志级别（`log <tag> <level>`） |
 | `sd` | 卡状态 / 日志文件清单 / 剩余空间 |
 | `snapshot` | 输出 JSON 状态快照（供上位机解析） |
+| `play <path>` | SD 卡音频文件播放（MP3/WAV/FLAC/AAC…，路径相对挂载根） |
+| `play-loop <path>` | SD 卡文件**循环播放**（直至 `stop`） |
+| `play-url <url>` | **HTTP(S) 下载歌曲到 `/sdcard/download/` 后循环播放**（测试用，见 6.2） |
+| `stop` / `pause` / `resume` | 停止 / 暂停 / 继续播放 |
+| `vol <0-100>` | 播放音量 |
+| `player` | 播放器状态 |
+| `rec [秒]` | **录音 N 秒（默认 30）→ WAV（`/sdcard/record/rec.wav`）→ 自动播放**（见 6.3） |
+| `rec-stop` | 提前结束录音（保留已录 WAV） |
+| `voice` / `voice-listen` / `voice-stop` | 语音状态 / 开始聆听 / 停止聆听 |
 | `help` | 命令列表 |
 
 #### 3.8.4 日志规则（补充 3.4 规则 11）
@@ -774,10 +783,18 @@ I2C:  SDA(IO0)/SCL(IO1) → ES8389 控制 (0x20)，与 QMI8658A(0x6A) 共用总�
 
 - **管线**：SD 文件（`file://sdcard/...` URI）→ **esp_audio_simple_player**（ESP-GMF 解码 + 采样率/声道/位深转换）→ PCM 输出回调 → **esp_codec_dev**（ES8389，I2S 主模式，引脚见 2.4.1）
 - **格式**：mp3 / wav / flac / aac / amr / m4a / opus（按文件扩展名自动选择解码器，menuconfig 可裁剪以省 Flash）
-- **API**：`player_play_file(path)` / `player_stop` / `player_pause` / `player_resume` / `player_set_volume` / `player_get_state` + 状态事件回调
-- **codec 生命周期**：收到 `MUSIC_INFO` 事件（采样率/声道/位深）→ `esp_codec_dev_open` → 功放使能；`STOPPED/FINISHED/ERROR` → 关 codec → 功放关闭（防爆音，3.3.1 #3）
-- **控制入口**：diag console 命令 `play / stop / pause / resume / vol / player`；后续接 UI 与语音意图
-- ⚠️ 出声前提：MCLK 接线（原理图修订 2.6 #1）+ ES8389 驱动上板实测（`es8389_codec_cfg_t` 字段以实际头文件为准）
+- **API**：`player_play_file(path)` / `player_play_loop(path)`（FINISHED 自动重播，`stop` 终止）/ `player_play_url(url)`（HTTP(S) 下载到 SD 后循环播放，静态下载任务 + esp_http_client 流式落盘，文件名取 URL basename、无扩展名补 .mp3）/ `player_stop` / `player_pause` / `player_resume` / `player_set_volume` / `player_get_state` + 状态事件回调
+- **codec 生命周期**：收到 `MUSIC_INFO` 事件（采样率/声道/位深）→ `esp_codec_dev_open` → 功放使能；`STOPPED/FINISHED/ERROR` → 关 codec → 功放关闭（防爆音，3.3.1 #3）；循环模式跨曲保持打开
+- **控制入口**：diag console 命令 `play / play-loop / play-url / stop / pause / resume / vol / player`；后续接 UI 与语音意图
+- ⚠️ 出声前提：MCLK 接线（原理图修订 2.6 #1）+ ES8389 驱动上板实测（`es8389_codec_cfg_t` 子配置已按官方 esp-audio-dev 语义细化：`sys_cfg.is_master=false` 从模式、`no_mclk=false` 使用 MCLK、`adc_cfg` 模拟麦、`pa_cfg.pa_pin=-1` 交由 bsp_amplifier 防双控；I2S 双通道 TX+RX 支持录音）
+
+### 6.3 录音 → WAV → 回放（已实现，`components/voice/`）
+
+- **入口**：console `rec [秒]`（默认 30，1..600）→ `voice_record_start(seconds, path)`；`rec-stop` 提前结束
+- **管线**：ES8389 ADC → I2S RX → `esp_codec_dev_read`（48 kHz / 2 ch / 16 bit，与播放共享时钟域）→ 静态缓冲流式写 `/sdcard/record/rec.wav`（44 字节 RIFF 头逐字节填充，录完回填 data_size）
+- **回放**：录音完成自动 `player_play_file(path)`（console 提示 + voice 状态事件）
+- **状态**：`VOICE_STATE_RECORDING`（`voice` 命令可查）；录音与聆听互斥（voice_task 串行）
+- 录音文件大小：48k/2ch/16bit ≈ 192 KB/s（30 s ≈ 5.5 MB，SD 卡充裕；如需压缩后续接 OPUS 编码器）
 
 ---
 
@@ -1256,7 +1273,7 @@ ES8389（[Everest 产品页](http://www.everest-semi.com/en_products.php)）· N
 | [ESP32-S31-Korvo-1 用户指南](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s31/esp32-s31-korvo-1/user_guide.html) | 双麦阵列 + LCD + TF 卡，语音链路参考 |
 | [ESP-Mosaico](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s31/esp-mosaico/index.html) | 带屏便携音箱形态 |
 | [xiaozhi-esp32](https://github.com/xiaozhi-esp32/xiaozhi-esp32) | 开源智能音箱（S3 时代标杆，语音链路可借鉴） |
-| [esp_codec_dev 源码](https://github.com/espressif/esp_codec_dev) | ES8389 驱动实现参考 |
+| [esp_codec_dev 源码](https://github.com/espressif/esp-audio-dev/tree/main/esp_codec_dev) | ES8389 驱动实现参考（2.x 子配置语义见 `interface/audio_codec_hw_cfg.h`） |
 
 ---
 

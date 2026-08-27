@@ -217,11 +217,14 @@ static void s_sys_task(void *arg)
             (void)bsp_power_set_led(s_led_on);
             break;
         case APP_EVT_BTN3_LONG: {
-            /* 语音聆听开关（骨架阶段：按键触发；M9 接入唤醒词） */
+            /* 语音聆听开关（骨架阶段：按键触发；M9 接入唤醒词）；
+             * 录音中长按 = 提前结束录音（rec-stop 等价） */
             voice_state_t vst = VOICE_STATE_IDLE;
             (void)voice_get_state(&vst);
             if (vst == VOICE_STATE_LISTENING) {
                 (void)voice_listen_stop();
+            } else if (vst == VOICE_STATE_RECORDING) {
+                (void)voice_record_stop();
             } else {
                 (void)voice_listen_start();
             }

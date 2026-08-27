@@ -57,6 +57,9 @@ static bool s_loop;
 static char s_loop_uri[PLAYER_URI_MAX];
 
 /* ---------------- URL 下载任务 ---------------- */
+#define PLAYER_DL_NAME_MAX   64U     /* 文件名上限（FAT 长文件名支持，且
+                                      * 保证 /sdcard/download/<name> 总长
+                                      * 不触发 -Werror=format-truncation） */
 static FILE *s_dl_file;
 static char s_dl_url[CONFIG_LERO_PLAYER_DL_URL_MAX];
 static volatile bool s_dl_busy;
@@ -391,7 +394,7 @@ static void s_download_task(void *arg)
             continue;
         }
 
-        char name[CONFIG_LERO_PLAYER_DL_URL_MAX];
+        char name[PLAYER_DL_NAME_MAX];
         s_extract_filename(s_dl_url, name, sizeof(name));
         char dir[96];
         (void)snprintf(dir, sizeof(dir), "%s", CONFIG_LERO_PLAYER_DL_DIR);
