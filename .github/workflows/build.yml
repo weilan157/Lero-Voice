@@ -42,9 +42,11 @@ jobs:
           # esp_async_fbcpy.h 但未声明组件依赖（编译报头文件缺失，
           # esp32.com 论坛已确认官方 factory_demo 同问题），
           # IDF 6.2+ 改用内置 esp_driver_dma 的 esp_async_color_convert.h。
-          # 截至 2026-08-27 IDF 6.2 未正式发布：Docker Hub 无
-          # release-v6.2 / v6.2 / master tag，试 rc tag（v6.2-rc1）。
-          esp_idf_version: v6.2-rc1
+          # 截至 2026-08-27：Docker Hub 仅有 6.1 及更早 tag（6.2 未发布，
+          # 无 release-v6.2 / v6.2 / v6.2-rc1 / master）→ 用 release-v6.1
+          # 镜像，容器内将 IDF 升级到 master 源码（唯一含
+          # esp_async_color_convert 的版本线；6.2 发布后改回固定 tag）。
+          esp_idf_version: release-v6.1
           target: esp32s31
           path: '.'
           # 组件依赖：IDF v6.1 起组件管理器不再随 cmake 自动执行
@@ -52,7 +54,16 @@ jobs:
           # 调用 idf.py update-dependencies 拉取 managed_components/；
           # 顺带确保/升级 idf-component-manager pip 包匹配接口版本。
           command: |
+            PROJ=$(pwd)
             python -m pip install -U --quiet idf-component-manager
+            # ---- 升级 IDF 到 master（fbcpy/color_convert 仅在 master）----
+            cd "$IDF_PATH"
+            git fetch --depth=1 https://github.com/espressif/esp-idf.git master
+            git checkout -f FETCH_HEAD
+            git submodule update --init --recursive --depth=1
+            ./install.sh esp32s31
+            . ./export.sh
+            cd "$PROJ"
             idf.py update-dependencies
             idf.py build
           # 注意：extra_docker_args 必须为单行（action 将其嵌入多行 docker
@@ -83,7 +94,7 @@ jobs:
             '{version:$v, min_app_version:"v1.0.0", target:"esp32s31-wroom-3",
               soc:"esp32s31", flash_size:16777216, psram:true,
               app_bin:"Lero-Voice.bin", app_bin_size:$n, app_sha256:$s,
-              partition_table_sha256:$p, idf_version:"v6.2.0",
+              partition_table_sha256:$p, idf_version:"master (6.2-dev)",
               build_date:(now|todateiso8601), release_notes:"", signature:""}' > meta.json
 
       - name: Create Release (tag only)

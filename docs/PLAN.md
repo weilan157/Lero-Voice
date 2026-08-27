@@ -1233,7 +1233,7 @@ SD 卡目录约定：
   "app_bin_size": 1234567,
   "app_sha256": "8f4a...（64 位 hex）",
   "partition_table_sha256": "a3c9...（64 位 hex）",
-  "idf_version": "v6.2.0",
+  "idf_version": "master (6.2-dev)",
   "build_date": "2026-09-01T10:00:00Z",
   "release_notes": "修复 MCLK 驱动；新增 Matter 支持",
   "signature": "base64(RSA/ECDSA 签名，量产必带)"
@@ -1296,7 +1296,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: master  # 滚动镜像（S31 工具链 + esp_async_color_convert；v6.0 全系不含；6.2 未发布无固定 tag，发布后改回 v6.2）
+          esp_idf_version: release-v6.1  # 镜像仅 6.1；容器内再升级 IDF 到 master 源码（唯一含 esp_async_color_convert；6.2 发布后改回固定 tag）
           target: esp32s31
           path: '.'
           # 容器内执行：升级组件管理器 + 显式拉取依赖（v6.1 起不再随 cmake 自动执行）+ 构建
@@ -1321,7 +1321,7 @@ jobs:
             '{version:$v, min_app_version:"v1.0.0", target:"esp32s31-wroom-3",
               soc:"esp32s31", flash_size:16777216, psram:true,
               app_bin:"Lero-Voice.bin", app_bin_size:$n, app_sha256:$s,
-              partition_table_sha256:$p, idf_version:"v6.2.0",
+              partition_table_sha256:$p, idf_version:"master (6.2-dev)",
               build_date:(now|todateiso8601), release_notes:"", signature:""}' > meta.json
       - name: Create Release
         uses: softprops/action-gh-release@v2
