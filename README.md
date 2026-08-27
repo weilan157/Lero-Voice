@@ -30,7 +30,7 @@
 
 | 模块 | 选型 |
 |------|------|
-| 核心框架 | ESP-IDF **v6.2+**（target: `esp32s31`；v6.0 版本线不含 S31 支持） |
+| 核心框架 | ESP-IDF **master / 6.2+**（target: `esp32s31`；6.2 未发布暂用 master；v6.0 版本线不含 S31 支持） |
 | 音频框架 | ESP-GMF + esp_codec_dev（ES8389 官方驱动，≥ v1.3.6） |
 | 音频播放 | esp_audio_simple_player（ESP-GMF，SD 卡 MP3/WAV/FLAC/AAC/AMR/M4A） |
 | 显示 | LVGL v9 + esp_lvgl_port + SquareLine Studio |
@@ -49,7 +49,7 @@
 | 操作系统 | Windows 10/11 · macOS 12+ · Ubuntu 20.04/22.04 | 任一即可 |
 | Git | ≥ 2.30 | 克隆 ESP-IDF 与本项目 |
 | Python | 3.10+（由 ESP-IDF 安装脚本自动管理） | 无需单独安装 |
-| **ESP-IDF** | **v6.2+**（esp32s31 支持的最低版本线；**v6.0 无 S31 工具链**） | CMake/Ninja/工具链由 `install.sh` 自动安装 |
+| **ESP-IDF** | **master / 6.2+**（esp32s31 最低完整支持线；6.2 未发布暂用 master；**v6.0 无 S31 工具链**） | CMake/Ninja/工具链由 `install.sh` 自动安装 |
 | 串口驱动 | CP210x / CH340（按调试器芯片安装） | Windows 下需手动安装 |
 
 > 详细安装步骤、首次配置、VS Code 与常见问题见 [🛠️ 开发环境搭建指南](docs/SETUP.md)。
@@ -79,7 +79,7 @@
 ## 快速开始
 
 ```bash
-# 1. 安装 ESP-IDF（master 或 release/v6.2 分支；v6.0 无 esp32s31 支持）
+# 1. 安装 ESP-IDF（master 分支（6.2 未发布）；v6.0 无 esp32s31 支持）
 git clone --recursive https://github.com/espressif/esp-idf.git
 cd esp-idf
 ./install.sh esp32s31
