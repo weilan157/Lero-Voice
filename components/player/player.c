@@ -43,7 +43,7 @@
 
 #define TAG "player"
 
-#define PLAYER_URI_MAX      192U
+#define PLAYER_URI_MAX      384U   /* file URI 与 http(s) URL 共用上限 */
 #define PLAYER_URI_PREFIX   "file://sdcard/"
 
 static esp_asp_handle_t s_player;
@@ -282,6 +282,25 @@ esp_err_t player_play_loop(const char *path)
         return err;
     }
     return s_play_uri(uri, true);
+}
+
+esp_err_t player_play_http(const char *url)
+{
+    if ((url == NULL) || (s_player == NULL)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    /* 仅接受 http(s) scheme；直接流式播放（不落盘，无需 SD 卡）。
+     * esp_audio_simple_player 按 URI scheme 选择 IO：http:// → HTTP stream */
+    if ((strncasecmp(url, "http://", 7U) != 0) && (strncasecmp(url, "https://", 8U) != 0)) {
+        ESP_LOGE(TAG, "unsupported scheme (need http:// or https://): %.32s", url);
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (strlen(url) >= sizeof(s_loop_uri)) {
+        ESP_LOGE(TAG, "url too long (%u >= %u)", (unsigned)strlen(url),
+                 (unsigned)sizeof(s_loop_uri));
+        return ESP_ERR_INVALID_SIZE;
+    }
+    return s_play_uri(url, true);   /* 循环：FINISHED 后重新请求同一 URL */
 }
 
 esp_err_t player_stop(void)

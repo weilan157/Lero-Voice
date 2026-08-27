@@ -287,11 +287,24 @@ static int cmd_play_url(int argc, char **argv)
 {
     if (argc != 2) {
         printf("usage: play-url <http(s) url>\n");
-        printf("  download the song to SD then play it in loop\n");
+        printf("  stream the URL (no SD card needed) and play it in loop\n");
+        printf("  (SD download variant: play-dl <url>)\n");
+        return 1;
+    }
+    esp_err_t err = player_play_http(argv[1]);
+    printf("play-url: %s\n", (err == ESP_OK) ? "streaming started" : esp_err_to_name(err));
+    return 0;
+}
+
+static int cmd_play_dl(int argc, char **argv)
+{
+    if (argc != 2) {
+        printf("usage: play-dl <http(s) url>\n");
+        printf("  download the song to SD (/sdcard/download) then play it in loop\n");
         return 1;
     }
     esp_err_t err = player_play_url(argv[1]);
-    printf("play-url: %s\n", (err == ESP_OK) ? "download started" : esp_err_to_name(err));
+    printf("play-dl: %s\n", (err == ESP_OK) ? "download started" : esp_err_to_name(err));
     return 0;
 }
 
@@ -638,7 +651,8 @@ esp_err_t diag_console_register(void)
         { .command = "snapshot", .help = "latest status snapshot",      .hint = NULL, .func = cmd_snapshot },
         { .command = "play",     .help = "play <path> (SD audio file)", .hint = NULL, .func = cmd_play },
         { .command = "play-loop",.help = "play <path> in loop until stop", .hint = NULL, .func = cmd_play_loop },
-        { .command = "play-url", .help = "download URL song to SD + loop play", .hint = NULL, .func = cmd_play_url },
+        { .command = "play-url", .help = "stream http(s) URL + loop play (no SD)", .hint = NULL, .func = cmd_play_url },
+        { .command = "play-dl",  .help = "download http(s) URL to SD + loop play", .hint = NULL, .func = cmd_play_dl },
         { .command = "rec",      .help = "record N s (default 30) to WAV + auto play", .hint = NULL, .func = cmd_rec },
         { .command = "rec-stop", .help = "stop recording early",        .hint = NULL, .func = cmd_rec_stop },
         { .command = "stop",     .help = "stop playback",               .hint = NULL, .func = cmd_stop },

@@ -153,7 +153,7 @@ Lero-Voice/            # 仓库根 = ESP-IDF 工程（target: esp32s31）
 ```
 play audio/example.mp3    # 开始播放（也支持绝对路径 /sdcard/audio/example.mp3）
 play-loop audio/example.mp3  # 循环播放（stop 终止）
-play-url https://.../song.mp3  # 下载歌曲到 SD 后一直循环播放
+play-url https://.../song.mp3  # HTTP 流式播放（无需 SD 卡），循环
 pause / resume            # 暂停 / 继续
 stop                      # 停止
 vol 80                    # 音量 0-100

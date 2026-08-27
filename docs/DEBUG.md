@@ -52,7 +52,7 @@ Lero Voice 0.1.0 boot (IDF v6.1)
 | `touch` | FT6336U 状态 + 实时坐标（按下显示 x/y） |
 | `power` | 电池/总线电压、充电状态、电量百分比 |
 | `sd` | SD 卡状态 + 日志文件清单 |
-| `play <path>` / `play-loop` / `play-url` | 播放 / 循环 / URL 下载播放 |
+| `play <path>` / `play-loop` / `play-url <url>` / `play-dl <url>` | 播放 / 循环 / **HTTP 流式播放（无需 SD）** / 下载到 SD 后循环 |
 | `stop` / `pause` / `resume` / `vol <0-100>` / `player` | 播放控制 |
 | `rec [秒]` / `rec-stop` | 录音（默认 30s → WAV → 自动播放）/ 提前结束 |
 | `wifi` / `ota` / `ota-check` / `ota-sd` / `ota-confirm` / `ota-cancel` | 配网与 OTA |

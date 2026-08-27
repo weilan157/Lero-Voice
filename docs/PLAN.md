@@ -821,7 +821,8 @@ components/diag/
 | `snapshot` | 输出 JSON 状态快照（供上位机解析） |
 | `play <path>` | SD 卡音频文件播放（MP3/WAV/FLAC/AAC…，路径相对挂载根） |
 | `play-loop <path>` | SD 卡文件**循环播放**（直至 `stop`） |
-| `play-url <url>` | **HTTP(S) 下载歌曲到 `/sdcard/download/` 后循环播放**（测试用，见 6.2） |
+| `play-url <url>` | **HTTP(S) 流式播放**（esp_audio_simple_player HTTP IO，无需 SD 卡，循环；见 6.2） |
+| `play-dl <url>` | HTTP(S) 下载歌曲到 `/sdcard/download/` 后循环播放（测试用，见 6.2） |
 | `stop` / `pause` / `resume` | 停止 / 暂停 / 继续播放 |
 | `vol <0-100>` | 播放音量 |
 | `player` | 播放器状态 |
@@ -1009,9 +1010,9 @@ I2C:  SDA(IO0)/SCL(IO1) → ES8389 控制 (0x20)，与 QMI8658A(0x6A) 共用总�
 
 - **管线**：SD 文件（`file://sdcard/...` URI）→ **esp_audio_simple_player**（ESP-GMF 解码 + 采样率/声道/位深转换）→ PCM 输出回调 → **esp_codec_dev**（ES8389，I2S 主模式，引脚见 2.4.1）
 - **格式**：mp3 / wav / flac / aac / amr / m4a / opus（按文件扩展名自动选择解码器，menuconfig 可裁剪以省 Flash）
-- **API**：`player_play_file(path)` / `player_play_loop(path)`（FINISHED 自动重播，`stop` 终止）/ `player_play_url(url)`（HTTP(S) 下载到 SD 后循环播放，静态下载任务 + esp_http_client 流式落盘，文件名取 URL basename、无扩展名补 .mp3）/ `player_stop` / `player_pause` / `player_resume` / `player_set_volume` / `player_get_state` + 状态事件回调
+- **API**：`player_play_file(path)` / `player_play_loop(path)`（FINISHED 自动重播，`stop` 终止）/ `player_play_http(url)`（**HTTP(S) 流式播放**：esp_audio_simple_player 按 URI scheme 选 IO，`http://` 走 HTTP stream，无需 SD 卡，循环）/ `player_play_url(url)`（HTTP(S) 下载到 SD 后循环播放，静态下载任务 + esp_http_client 流式落盘，文件名取 URL basename、无扩展名补 .mp3）/ `player_stop` / `player_pause` / `player_resume` / `player_set_volume` / `player_get_state` + 状态事件回调
 - **codec 生命周期**：收到 `MUSIC_INFO` 事件（采样率/声道/位深）→ `esp_codec_dev_open` → 功放使能；`STOPPED/FINISHED/ERROR` → 关 codec → 功放关闭（防爆音，3.3.1 #3）；循环模式跨曲保持打开
-- **控制入口**：diag console 命令 `play / play-loop / play-url / stop / pause / resume / vol / player`；后续接 UI 与语音意图
+- **控制入口**：diag console 命令 `play / play-loop / play-url（HTTP 流式）/ play-dl（下载）/ stop / pause / resume / vol / player`；后续接 UI 与语音意图
 - ✅ **无需 MCLK**：ES8389 采用官方驱动的 **BCLK PIN 模式**（`no_mclk=true`，REG0x02[7:6]=01，时钟从 I2S BCLK 派生；驱动按 BCLK=fs×bits×2 查 coeff_div 系数表，16bit/2ch 时 BCLK=32×fs 与表匹配）。原理图 pin4(MCLK/TDMIN) 与 DACDAT 短接共接 I2S_DSDIN 为省 MCLK 设计，BCLK 模式下无影响。上板实测项：`es8389_codec_cfg_t` 子配置（`sys_cfg.is_master=false` 从模式、`no_mclk=true`、`adc_cfg` 模拟麦、`pa_cfg.pa_pin=-1` 交由 bsp_amplifier 防双控；I2S 双通道 TX+RX 支持录音）
 
 ### 6.3 录音 → WAV → 回放（已实现，`components/voice/`）
