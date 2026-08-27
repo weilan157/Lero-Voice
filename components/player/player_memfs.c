@@ -43,8 +43,12 @@ static bool s_is_rec_file(const char *path)
     return (path != NULL) && (strcmp(path, MEMFS_PATH) == 0);
 }
 
-static int s_vfs_open(const char *path, int flags, int mode)
+/* IDF master(6.2-dev) 的 esp_vfs_t 已切换到带 ctx 的 *_p 回调（无 ctx 版
+ * deprecated）；ctx 为注册时传入（本项目传 NULL，不使用） */
+
+static int s_vfs_open(void *ctx, const char *path, int flags, int mode)
 {
+    (void)ctx;
     (void)flags;
     (void)mode;
     if (!s_is_rec_file(path)) {
@@ -55,8 +59,9 @@ static int s_vfs_open(const char *path, int flags, int mode)
     return MEMFS_LOCAL_FD;
 }
 
-static ssize_t s_vfs_read(int fd, void *dst, size_t size)
+static ssize_t s_vfs_read(void *ctx, int fd, void *dst, size_t size)
 {
+    (void)ctx;
     if (fd != MEMFS_LOCAL_FD) {
         errno = EBADF;
         return -1;
@@ -78,8 +83,9 @@ static ssize_t s_vfs_read(int fd, void *dst, size_t size)
     return (ssize_t)n;
 }
 
-static off_t s_vfs_seek(int fd, off_t offset, int whence)
+static off_t s_vfs_lseek(void *ctx, int fd, off_t offset, int whence)
 {
+    (void)ctx;
     if (fd != MEMFS_LOCAL_FD) {
         errno = EBADF;
         return -1;
@@ -102,8 +108,9 @@ static off_t s_vfs_seek(int fd, off_t offset, int whence)
     return s_pos;
 }
 
-static int s_vfs_close(int fd)
+static int s_vfs_close(void *ctx, int fd)
 {
+    (void)ctx;
     if (fd != MEMFS_LOCAL_FD) {
         errno = EBADF;
         return -1;
@@ -112,8 +119,9 @@ static int s_vfs_close(int fd)
     return 0;
 }
 
-static int s_vfs_fstat(int fd, struct stat *st)
+static int s_vfs_fstat(void *ctx, int fd, struct stat *st)
 {
+    (void)ctx;
     if ((fd != MEMFS_LOCAL_FD) || (st == NULL)) {
         errno = EBADF;
         return -1;
@@ -131,12 +139,12 @@ esp_err_t player_memfs_init(void)
         return ESP_OK;
     }
     const esp_vfs_t vfs = {
-        .flags = ESP_VFS_FLAG_DEFAULT,
-        .open = s_vfs_open,
-        .read = s_vfs_read,
-        .seek = s_vfs_seek,
-        .close = s_vfs_close,
-        .fstat = s_vfs_fstat,
+        .flags = ESP_VFS_FLAG_CONTEXT_PTR,
+        .open_p = s_vfs_open,
+        .read_p = s_vfs_read,
+        .lseek_p = s_vfs_lseek,
+        .close_p = s_vfs_close,
+        .fstat_p = s_vfs_fstat,
     };
     const esp_err_t err = esp_vfs_register(MEMFS_MOUNT, &vfs, NULL);
     if (err != ESP_OK) {
