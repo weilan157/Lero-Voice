@@ -30,6 +30,7 @@
 #include "freertos/task.h"
 #include "bsp.h"
 #include "bsp_power.h"
+#include "bsp_display.h"
 #include "bsp_sdcard.h"
 #include "bsp_imu.h"
 #include "bsp_codec.h"
@@ -476,6 +477,22 @@ static int cmd_codec(int argc, char **argv)
     return 0;
 }
 
+static int cmd_bl(int argc, char **argv)
+{
+    if (argc != 2) {
+        printf("usage: bl <0-100>\n");
+        return 1;
+    }
+    const int v = atoi(argv[1]);
+    if ((v < 0) || (v > 100)) {
+        printf("usage: bl <0-100>\n");
+        return 1;
+    }
+    const esp_err_t err = bsp_display_backlight_set((uint8_t)v);
+    printf("bl %d%%: %s\n", v, (err == ESP_OK) ? "ok" : esp_err_to_name(err));
+    return 0;
+}
+
 static int cmd_power(int argc, char **argv)
 {
     (void)argc;
@@ -690,6 +707,7 @@ esp_err_t diag_console_register(void)
         { .command = "reg",      .help = "reg <bus0|bus1> <addr7> <reg>", .hint = NULL, .func = cmd_reg },
         { .command = "codec",    .help = "ES8389 register dump",          .hint = NULL, .func = cmd_codec },
         { .command = "power",    .help = "battery/bus voltage + charging",.hint = NULL, .func = cmd_power },
+        { .command = "bl",       .help = "backlight duty 0-100%% (BL_EN IO54)", .hint = NULL, .func = cmd_bl },
         { .command = "touch",    .help = "FT6336U status + coordinates",  .hint = NULL, .func = cmd_touch },
     };
     for (size_t i = 0U; i < (sizeof(s_cmds) / sizeof(s_cmds[0])); i++) {
