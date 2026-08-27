@@ -207,7 +207,7 @@
 | 5 | IO36 / IO37、IO60 未使用 | 可作为 MCLK / SD_DET / 红外发射等扩展资源 |
 | 6 | ⚠️ **IMU 中断未接主控**：QMI8658A 的 INT1/INT2 引脚无网络（仅 SDA/SCL/3V3/GND） | IMU 只能轮询读取，无法中断唤醒 / 手势中断；BSP 按轮询设计（后续要手势唤醒需改版补连） |
 | 7 | ⚠️ **IMU 地址脚 SA0 悬空**：SDO/SA0 未接，地址依赖内部默认（原理图标注 0x6A） | BSP 初始化时先探测 0x6A / 0x68 两个地址再锁定 |
-| 8 | ⚠️ **ADC 通道映射与衰减（上板实测确认）**：GPIO50/51 属 **ADC2**（CH0/CH1；ADC1 仅 GPIO42~49），且 S31 衰减需用 `ADC_ATTEN_DB_11`（`DB_12` 运行时报 invalid attenuation） | 已按 ADC2 + DB_11 修正；ADC2 与 Wi-Fi 活跃时的共存性需上板实测（若读数异常改用 ADC1 引脚或连续采样） |
+| 8 | ⚠️ **ADC 通道映射与衰减（上板实测确认）**：GPIO50/51 属 **ADC2**（CH0/CH1；ADC1 仅 GPIO42~49）；S31 为新一代 SAR ADC（17-bit、差分），`SOC_ADC_ATTEN_NUM=1` 仅 `ADC_ATTEN_DB_0` 合法（`DB_11` 编译期不存在、`DB_12` 运行时报 invalid attenuation，官方 oneshot 示例同此处理） | 已按 ADC2 + DB_0 修正；ADC2 与 Wi-Fi 活跃时的共存性需上板实测（若读数异常改用 ADC1 引脚或连续采样） |
 
 ---
 

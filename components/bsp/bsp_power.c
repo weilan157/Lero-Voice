@@ -59,7 +59,9 @@ esp_err_t bsp_power_init(void)
     /* S31 ADC 映射（soc/esp32s31/adc_channel.h）：
      *   ADC1: GPIO42~49 = CH0~7
      *   ADC2: GPIO50~57 = CH0~7（BAT_ADC=IO50→ADC2_CH0, BUS_ADC=IO51→ADC2_CH1）
-     * 衰减使用 ADC_ATTEN_DB_11（DB_12 在 S31 非法，运行时报 invalid attenuation）。
+     * S31 ADC 为新一代 SAR（17-bit、支持差分）：SOC_ADC_ATTEN_NUM=1，
+     * 仅 ADC_ATTEN_DB_0 合法（DB_11 在 S31 编译期不存在、DB_12 运行时报
+     * invalid attenuation，见官方 examples/peripherals/adc/oneshot_read）。
      * 注意：ADC2 与 Wi-Fi 的共存性需上板实测（部分芯片 ADC2 在 Wi-Fi 活跃时
      * 读数不可用；若受影响需改用 ADC1 引脚或连续采样模式）。 */
 #define ADC_MONITOR_UNIT  ADC_UNIT_2
@@ -74,7 +76,7 @@ esp_err_t bsp_power_init(void)
     }
 
     adc_oneshot_chan_cfg_t chan_cfg = {
-        .atten = ADC_ATTEN_DB_11,
+        .atten = ADC_ATTEN_DB_0,
         .bitwidth = ADC_BITWIDTH_DEFAULT,
     };
     err = adc_oneshot_config_channel(s_adc, (adc_channel_t)CONFIG_LERO_BAT_ADC_CHANNEL, &chan_cfg);
@@ -94,7 +96,7 @@ esp_err_t bsp_power_init(void)
     adc_cali_curve_fitting_config_t cali_cfg = {
         .unit_id = ADC_MONITOR_UNIT,
         .chan = (adc_channel_t)CONFIG_LERO_BAT_ADC_CHANNEL,
-        .atten = ADC_ATTEN_DB_11,
+        .atten = ADC_ATTEN_DB_0,
         .bitwidth = ADC_BITWIDTH_DEFAULT,
     };
     err = adc_cali_create_scheme_curve_fitting(&cali_cfg, &s_cali);
