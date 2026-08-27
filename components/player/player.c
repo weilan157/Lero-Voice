@@ -100,6 +100,9 @@ static void s_finish(player_state_t state)
     }
 }
 
+static void s_finish(player_state_t state);
+static esp_err_t s_play_uri(const char *uri, bool loop);   /* 定义在下方，s_event 先引用 */
+
 static int s_event(esp_asp_event_pkt_t *event, void *ctx)
 {
     (void)ctx;
