@@ -78,15 +78,28 @@ static void s_voice_task(void *arg)
             s_record_stop = false;
             voice_set_state(VOICE_STATE_RECORDING, "record start");
 
+            /* s_record_path[0]=='\0' → 内存模式（PSRAM，无 SD） */
             const esp_err_t err = voice_capture_record_run(
-                s_record_seconds, s_record_path, &s_record_stop);
+                s_record_seconds,
+                (s_record_path[0] != '\0') ? s_record_path : NULL,
+                &s_record_stop);
             s_record_stop = false;
 
             voice_set_state(VOICE_STATE_IDLE,
                             (err == ESP_OK) ? "record done" : "record failed");
             if (err == ESP_OK) {
-                ESP_LOGI(TAG, "record ok, auto playing: %s", s_record_path);
-                (void)player_play_file(s_record_path);  /* 录完直接播放 */
+                if (s_record_path[0] != '\0') {
+                    ESP_LOGI(TAG, "record ok, auto playing: %s", s_record_path);
+                    (void)player_play_file(s_record_path);  /* SD 文件 */
+                } else {
+                    const uint8_t *buf = NULL;
+                    size_t sz = 0U;
+                    if (voice_capture_get_rec_mem(&buf, &sz) == ESP_OK) {
+                        ESP_LOGI(TAG, "record ok (%u B), auto playing from RAM",
+                                 (unsigned)sz);
+                        (void)player_play_mem(buf, sz);     /* 内存回放 */
+                    }
+                }
             }
         }
         vTaskDelay(pdMS_TO_TICKS(50U));
@@ -159,12 +172,12 @@ esp_err_t voice_record_start(uint32_t seconds, const char *path)
     if (path != NULL) {
         (void)strlcpy(s_record_path, path, sizeof(s_record_path));
     } else {
-        (void)strlcpy(s_record_path, CONFIG_LERO_VOICE_RECORD_DEFAULT_PATH,
-                      sizeof(s_record_path));
+        s_record_path[0] = '\0';    /* NULL → 内存录音（PSRAM，无需 SD） */
     }
     s_record_request = true;
     ESP_LOGI(TAG, "record scheduled: %u s -> %s",
-             (unsigned)seconds, s_record_path);
+             (unsigned)seconds,
+             (s_record_path[0] != '\0') ? s_record_path : "in-RAM (no SD)");
     return ESP_OK;
 }
 

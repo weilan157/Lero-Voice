@@ -40,11 +40,13 @@
 #include "bsp_amplifier.h"
 #include "bsp_sdcard.h"
 #include "player.h"
+#include "player_memfs.h"
 
 #define TAG "player"
 
 #define PLAYER_URI_MAX      384U   /* file URI 与 http(s) URL 共用上限 */
-#define PLAYER_URI_PREFIX   "file://sdcard/"
+/* 注意三斜杠：file IO 的 get_mount_path 仅当 "://" 后是 '/' 时返回绝对路径 */
+#define PLAYER_URI_PREFIX   "file:///sdcard/"
 
 static esp_asp_handle_t s_player;
 static esp_codec_dev_handle_t s_codec;
@@ -200,6 +202,8 @@ esp_err_t player_init(void)
     }
     s_state = PLAYER_STATE_IDLE;
     (void)player_set_volume((uint8_t)CONFIG_LERO_PLAYER_DEFAULT_VOLUME);
+    /* 内存 WAV 播放 VFS（/mem，无 SD 时 rec 回放用） */
+    (void)player_memfs_init();
     ESP_LOGI(TAG, "player ready (esp_audio_simple_player)");
     return ESP_OK;
 }
@@ -301,6 +305,20 @@ esp_err_t player_play_http(const char *url)
         return ESP_ERR_INVALID_SIZE;
     }
     return s_play_uri(url, true);   /* 循环：FINISHED 后重新请求同一 URL */
+}
+
+esp_err_t player_play_mem(const uint8_t *data, size_t size)
+{
+    if ((data == NULL) || (size < 44U) || (s_player == NULL)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    esp_err_t err = player_memfs_set_data(data, size);
+    if (err != ESP_OK) {
+        return err;
+    }
+    /* 走 file IO + /mem VFS：不碰 SD，纯内存播放（WAV 由扩展名选择解码器）。
+     * 三斜杠：get_mount_path 才能解析出绝对路径 /mem/rec.wav */
+    return s_play_uri("file:///mem/rec.wav", false);
 }
 
 esp_err_t player_stop(void)

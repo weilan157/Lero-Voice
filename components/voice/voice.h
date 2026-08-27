@@ -29,11 +29,17 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "sdkconfig.h"
 #include "esp_err.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* 内存录音（无 SD 卡）秒数上限：由 PSRAM 录音缓冲容量决定（voice/Kconfig） */
+#define VOICE_RECORD_MEM_MAX_SECONDS \
+    (((uint32_t)CONFIG_LERO_VOICE_RECORD_MEM_BUF_KB * 1024U) / \
+     ((uint32_t)CONFIG_LERO_VOICE_SAMPLE_RATE * CONFIG_LERO_VOICE_CHANNELS * 2U))
 
 typedef enum {
     VOICE_STATE_IDLE = 0,       /*< 空闲 */
@@ -68,7 +74,9 @@ esp_err_t voice_listen_stop(void);
  *        then play it back automatically (console test command "rec").
  * @param[in] seconds  Recording duration (1..600). 0 = use Kconfig default.
  * @param[in] path     Output WAV path, absolute SD path (e.g.
- *                     "/sdcard/record/rec.wav"). NULL = Kconfig default.
+ *                     "/sdcard/record/rec.wav"). NULL = record into the
+ *                     in-RAM (PSRAM) buffer instead — no SD card needed;
+ *                     playback then streams from RAM automatically.
  * @return ESP_OK when the recording session was scheduled.
  */
 esp_err_t voice_record_start(uint32_t seconds, const char *path);

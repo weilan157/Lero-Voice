@@ -131,8 +131,19 @@ voice_capture_result_t voice_capture_run(volatile bool *stop)
 }
 
 /* ------------------------------------------------------------------------- */
-/* 录音：PCM(48k/2ch/16bit) -> WAV 文件（SD 卡），录完回填文件头              */
+/* 录音：PCM(48k/2ch/16bit) -> WAV（SD 文件 或 PSRAM 内存缓冲）              */
+/* path == NULL 时录到静态 PSRAM 缓冲（无 SD 卡可用），录完回填头并自动回放    */
 /* ------------------------------------------------------------------------- */
+
+/* 内存录音缓冲：静态 PSRAM BSS（CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY）
+ * 容量 = BUF_KB*1024 字节；@48k/2ch/16bit = 192000 B/s → 秒数上限见下 */
+static uint8_t s_rec_mem_buf[CONFIG_LERO_VOICE_RECORD_MEM_BUF_KB * 1024U];
+static size_t s_rec_mem_size;               /* 有效数据长度（含 WAV 头） */
+
+#define VOICE_REC_MEM_BYTES_PER_SEC \
+    ((uint32_t)CONFIG_LERO_VOICE_SAMPLE_RATE * CONFIG_LERO_VOICE_CHANNELS * 2U)
+#define VOICE_REC_MEM_MAX_SECONDS \
+    (((uint32_t)CONFIG_LERO_VOICE_RECORD_MEM_BUF_KB * 1024U) / VOICE_REC_MEM_BYTES_PER_SEC)
 
 /* 逐字节填充 44 字节 RIFF/WAVE 头（MISRA 友好，不用 packed struct） */
 static void s_wav_fill_header(uint8_t *hdr, uint32_t sample_rate,
@@ -178,16 +189,43 @@ static void s_wav_fill_header(uint8_t *hdr, uint32_t sample_rate,
 esp_err_t voice_capture_record_run(uint32_t seconds, const char *path,
                                    volatile bool *stop)
 {
-    if ((seconds == 0U) || (seconds > 600U) || (path == NULL)) {
+    if ((seconds == 0U) || (seconds > 600U)) {
         return ESP_ERR_INVALID_ARG;
     }
     if (s_codec == NULL) {
         return ESP_ERR_NOT_FOUND;
     }
-    esp_err_t err = bsp_sdcard_poll();          /* 确保 SD 已挂载 */
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "record: SD unavailable: %s", esp_err_to_name(err));
-        return err;
+    const bool mem_mode = (path == NULL);   /* NULL → 内存模式（无 SD） */
+    uint8_t *out_buf = NULL;
+    size_t out_cap = 0U;
+    FILE *fp = NULL;
+    if (mem_mode) {
+        if (seconds > (uint32_t)VOICE_REC_MEM_MAX_SECONDS) {
+            ESP_LOGE(TAG, "record: %u s exceeds in-RAM buffer (%u s max)",
+                     (unsigned)seconds, (unsigned)VOICE_REC_MEM_MAX_SECONDS);
+            return ESP_ERR_INVALID_SIZE;
+        }
+        out_buf = s_rec_mem_buf;
+        out_cap = sizeof(s_rec_mem_buf);
+    } else {
+        esp_err_t err = bsp_sdcard_poll();          /* 确保 SD 已挂载 */
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "record: SD unavailable: %s", esp_err_to_name(err));
+            return err;
+        }
+        /* 确保目标目录存在（取路径最后一个 '/' 之前的目录部分） */
+        char dir[96];
+        (void)strlcpy(dir, path, sizeof(dir));
+        char *slash = strrchr(dir, '/');
+        if ((slash != NULL) && (slash != dir)) {
+            *slash = '\0';
+            (void)mkdir(dir, 0755);
+        }
+        fp = fopen(path, "wb");
+        if (fp == NULL) {
+            ESP_LOGE(TAG, "record: open %s failed", path);
+            return ESP_FAIL;
+        }
     }
 
     /* 打开 codec IN（与聆听同格式，共享时钟域）；播放器占用时共享双工 */
@@ -201,29 +239,17 @@ esp_err_t voice_capture_record_run(uint32_t seconds, const char *path,
         ESP_LOGD(TAG, "record: codec already open; reading shared duplex");
     }
 
-    /* 确保目标目录存在（取路径最后一个 '/' 之前的目录部分） */
-    char dir[96];
-    (void)strlcpy(dir, path, sizeof(dir));
-    char *slash = strrchr(dir, '/');
-    if ((slash != NULL) && (slash != dir)) {
-        *slash = '\0';
-        (void)mkdir(dir, 0755);
-    }
-
-    FILE *fp = fopen(path, "wb");
-    if (fp == NULL) {
-        ESP_LOGE(TAG, "record: open %s failed", path);
-        if (opened) {
-            (void)esp_codec_dev_close(s_codec);
-        }
-        return ESP_FAIL;
-    }
-
     /* 先写占位头，录完回填 */
     uint8_t hdr[44];
     s_wav_fill_header(hdr, CONFIG_LERO_VOICE_SAMPLE_RATE,
                       CONFIG_LERO_VOICE_CHANNELS, 16U, 0U);
-    (void)fwrite(hdr, 1U, sizeof(hdr), fp);
+    size_t wav_pos = 0U;
+    if (mem_mode) {
+        (void)memcpy(out_buf, hdr, sizeof(hdr));
+        wav_pos = sizeof(hdr);
+    } else {
+        (void)fwrite(hdr, 1U, sizeof(hdr), fp);
+    }
 
     const int64_t start_us = esp_timer_get_time();
     const int64_t duration_us = (int64_t)seconds * 1000000LL;
@@ -239,10 +265,20 @@ esp_err_t voice_capture_record_run(uint32_t seconds, const char *path,
             vTaskDelay(pdMS_TO_TICKS(2U));
             continue;
         }
-        if (fwrite(s_pcm, 1U, (size_t)got, fp) != (size_t)got) {
-            ESP_LOGE(TAG, "record: write failed (SD full?)");
-            io_error = true;
-            break;
+        if (mem_mode) {
+            if ((wav_pos + (size_t)got) > out_cap) {   /* 溢出保护 */
+                ESP_LOGE(TAG, "record: in-RAM buffer full");
+                io_error = true;
+                break;
+            }
+            (void)memcpy(&out_buf[wav_pos], s_pcm, (size_t)got);
+            wav_pos += (size_t)got;
+        } else {
+            if (fwrite(s_pcm, 1U, (size_t)got, fp) != (size_t)got) {
+                ESP_LOGE(TAG, "record: write failed (SD full?)");
+                io_error = true;
+                break;
+            }
         }
         data_size += (uint32_t)got;
     }
@@ -250,17 +286,34 @@ esp_err_t voice_capture_record_run(uint32_t seconds, const char *path,
     /* 回填 WAV 头（data_size 已知） */
     s_wav_fill_header(hdr, CONFIG_LERO_VOICE_SAMPLE_RATE,
                       CONFIG_LERO_VOICE_CHANNELS, 16U, data_size);
-    (void)fseek(fp, 0L, SEEK_SET);
-    (void)fwrite(hdr, 1U, sizeof(hdr), fp);
-    (void)fclose(fp);
+    if (mem_mode) {
+        (void)memcpy(out_buf, hdr, sizeof(hdr));        /* 缓冲头部覆写 */
+        s_rec_mem_size = sizeof(hdr) + (size_t)data_size;
+    } else {
+        (void)fseek(fp, 0L, SEEK_SET);
+        (void)fwrite(hdr, 1U, sizeof(hdr), fp);
+        (void)fclose(fp);
+    }
 
     if (opened) {
         (void)esp_codec_dev_close(s_codec);
     }
 
     ESP_LOGI(TAG, "record done: %s (%u bytes, %.1f s)",
-             path, (unsigned)data_size,
-             (double)data_size / (double)(CONFIG_LERO_VOICE_SAMPLE_RATE *
-                                          CONFIG_LERO_VOICE_CHANNELS * 2U));
+             mem_mode ? "in-RAM" : path, (unsigned)data_size,
+             (double)data_size / (double)VOICE_REC_MEM_BYTES_PER_SEC);
     return io_error ? ESP_FAIL : ESP_OK;
+}
+
+esp_err_t voice_capture_get_rec_mem(const uint8_t **buf, size_t *size)
+{
+    if ((buf == NULL) || (size == NULL)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (s_rec_mem_size == 0U) {
+        return ESP_ERR_NOT_FOUND;
+    }
+    *buf = s_rec_mem_buf;
+    *size = s_rec_mem_size;
+    return ESP_OK;
 }

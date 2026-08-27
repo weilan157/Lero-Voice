@@ -158,11 +158,12 @@ pause / resume            # 暂停 / 继续
 stop                      # 停止
 vol 80                    # 音量 0-100
 player                    # 查询播放状态
-rec [秒]                  # 录音 N 秒（默认 30）→ WAV → 自动播放
+rec [秒]                  # 录音 N 秒（默认 30）→ 内存 WAV → 自动回放（无需 SD）
+play-mem                  # 重播最近一次内存录音
 rec-stop                  # 提前结束录音
 ```
 
-> 播放管线：SD 文件 → ESP-GMF 解码（esp_audio_simple_player）→ PCM → ES8389（esp_codec_dev，I2S 主模式）。录音管线：ES8389 ADC → I2S RX → WAV（/sdcard/record/rec.wav）。✅ **无需 MCLK**：ES8389 用 BCLK PIN 模式（`no_mclk=true`，时钟从 I2S BCLK 派生，见 PLAN 2.6 #1）。
+> 播放管线：SD 文件 / HTTP 流（play-url）/ 内存 WAV（rec）→ ESP-GMF 解码（esp_audio_simple_player）→ PCM → ES8389（esp_codec_dev，I2S 主模式）。录音管线：ES8389 ADC → I2S RX → PSRAM 内存 WAV（无 SD 可用）。✅ **无需 MCLK**：ES8389 用 BCLK PIN 模式（`no_mclk=true`，时钟从 I2S BCLK 派生，见 PLAN 2.6 #1）。
 
 ## 开发约定
 

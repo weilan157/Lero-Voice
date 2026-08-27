@@ -31,9 +31,13 @@ esp_err_t voice_capture_init(void);
 /* 运行一次聆听会话（阻塞式，直至 stop/超时/端点）；*stop 由外部置位 */
 voice_capture_result_t voice_capture_run(volatile bool *stop);
 
-/* 录音 seconds 秒到 WAV 文件（阻塞式）；*stop 由外部置位提前结束 */
+/* 录音 seconds 秒到 WAV（阻塞式）；path==NULL → PSRAM 内存缓冲（无 SD）；
+ * *stop 由外部置位提前结束 */
 esp_err_t voice_capture_record_run(uint32_t seconds, const char *path,
                                    volatile bool *stop);
+
+/* 取最近一次内存录音（WAV 含头）；未录过返回 ESP_ERR_NOT_FOUND */
+esp_err_t voice_capture_get_rec_mem(const uint8_t **buf, size_t *size);
 
 /* voice_transport.c */
 esp_err_t voice_transport_init(void);

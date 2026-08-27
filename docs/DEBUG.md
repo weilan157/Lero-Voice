@@ -54,7 +54,8 @@ Lero Voice 0.1.0 boot (IDF v6.1)
 | `sd` | SD 卡状态 + 日志文件清单 |
 | `play <path>` / `play-loop` / `play-url <url>` / `play-dl <url>` | 播放 / 循环 / **HTTP 流式播放（无需 SD）** / 下载到 SD 后循环 |
 | `stop` / `pause` / `resume` / `vol <0-100>` / `player` | 播放控制 |
-| `rec [秒]` / `rec-stop` | 录音（默认 30s → WAV → 自动播放）/ 提前结束 |
+| `rec [秒]` / `rec-stop` | 录音（默认 30s → **内存 WAV → 自动播放，无需 SD**）/ 提前结束 |
+| `play-mem` | 重播最近一次内存录音 |
 | `wifi` / `ota` / `ota-check` / `ota-sd` / `ota-confirm` / `ota-cancel` | 配网与 OTA |
 | `voice` / `voice-listen` / `voice-stop` | 语音助手骨架 |
 | `log <tag\|*> <level>` | 运行时日志级别（如 `log bsp_codec debug`） |

@@ -72,6 +72,16 @@ esp_err_t player_play_loop(const char *path);
 esp_err_t player_play_http(const char *url);
 
 /**
+ * @brief Play a WAV buffer kept in RAM (PSRAM) without any SD card.
+ *        The data is exposed through the internal "/mem" VFS and played by
+ *        the standard file-IO pipeline (single playback, no loop).
+ * @param[in] data  WAV bytes including the 44-byte RIFF header.
+ * @param[in] size  Valid bytes in the buffer.
+ * @return ESP_OK when the pipeline started, error otherwise.
+ */
+esp_err_t player_play_mem(const uint8_t *data, size_t size);
+
+/**
  * @brief Download an audio file from a HTTP(S) URL to the SD card, then
  *        play it in loop mode (async; returns after the download task starts).
  * @param[in] url  HTTP(S) URL of the audio file (e.g. https://.../song.mp3).

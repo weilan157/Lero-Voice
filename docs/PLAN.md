@@ -826,7 +826,8 @@ components/diag/
 | `stop` / `pause` / `resume` | 停止 / 暂停 / 继续播放 |
 | `vol <0-100>` | 播放音量 |
 | `player` | 播放器状态 |
-| `rec [秒]` | **录音 N 秒（默认 30）→ WAV（`/sdcard/record/rec.wav`）→ 自动播放**（见 6.3） |
+| `rec [秒]` | **录音 N 秒（默认 30）→ 内存 WAV（PSRAM，无需 SD）→ 自动回放**；上限 = 缓冲容量 `VOICE_RECORD_MEM_MAX_SECONDS`（见 6.3） |
+| `play-mem` | 重播最近一次内存录音（无需 SD） |
 | `rec-stop` | 提前结束录音（保留已录 WAV） |
 | `voice` / `voice-listen` / `voice-stop` | 语音状态 / 开始聆听 / 停止聆听 |
 | `imu` | 读 QMI8658A：accel(mg)/gyro(mdps)/temp(°C) —— 上板验证 IMU |
@@ -1015,13 +1016,15 @@ I2C:  SDA(IO0)/SCL(IO1) → ES8389 控制 (0x20)，与 QMI8658A(0x6A) 共用总�
 - **控制入口**：diag console 命令 `play / play-loop / play-url（HTTP 流式）/ play-dl（下载）/ stop / pause / resume / vol / player`；后续接 UI 与语音意图
 - ✅ **无需 MCLK**：ES8389 采用官方驱动的 **BCLK PIN 模式**（`no_mclk=true`，REG0x02[7:6]=01，时钟从 I2S BCLK 派生；驱动按 BCLK=fs×bits×2 查 coeff_div 系数表，16bit/2ch 时 BCLK=32×fs 与表匹配）。原理图 pin4(MCLK/TDMIN) 与 DACDAT 短接共接 I2S_DSDIN 为省 MCLK 设计，BCLK 模式下无影响。上板实测项：`es8389_codec_cfg_t` 子配置（`sys_cfg.is_master=false` 从模式、`no_mclk=true`、`adc_cfg` 模拟麦、`pa_cfg.pa_pin=-1` 交由 bsp_amplifier 防双控；I2S 双通道 TX+RX 支持录音）
 
-### 6.3 录音 → WAV → 回放（已实现，`components/voice/`）
+### 6.3 录音 → WAV → 回放（已实现，`components/voice/`；默认内存模式，无需 SD）
 
-- **入口**：console `rec [秒]`（默认 30，1..600）→ `voice_record_start(seconds, path)`；`rec-stop` 提前结束
-- **管线**：ES8389 ADC → I2S RX → `esp_codec_dev_read`（48 kHz / 2 ch / 16 bit，与播放共享时钟域）→ 静态缓冲流式写 `/sdcard/record/rec.wav`（44 字节 RIFF 头逐字节填充，录完回填 data_size）
-- **回放**：录音完成自动 `player_play_file(path)`（console 提示 + voice 状态事件）
+- **入口**：console `rec [秒]`（默认 30，上限 `VOICE_RECORD_MEM_MAX_SECONDS`）→ `voice_record_start(seconds, path)`；`rec-stop` 提前结束
+- **管线**：ES8389 ADC → I2S RX → `esp_codec_dev_read`（48 kHz / 2 ch / 16 bit，与播放共享时钟域）→ 静态缓冲流式写入：
+  - **内存模式（默认，path=NULL）**：写入 PSRAM 静态缓冲（`LERO_VOICE_RECORD_MEM_BUF_KB` 默认 6 MB ≈ 31 s；`CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY` 放外部 RAM）——**无 SD 卡可用**
+  - SD 模式（显式 path）：写 `/sdcard/record/rec.wav`（44 字节 RIFF 头逐字节填充，录完回填 data_size）
+- **回放**：内存模式自动 `player_play_mem(buf, size)`（经 `/mem` VFS → file IO 管线，`play-mem` 可重播）；SD 模式自动 `player_play_file(path)`（console 提示 + voice 状态事件）
 - **状态**：`VOICE_STATE_RECORDING`（`voice` 命令可查）；录音与聆听互斥（voice_task 串行）
-- 录音文件大小：48k/2ch/16bit ≈ 192 KB/s（30 s ≈ 5.5 MB，SD 卡充裕；如需压缩后续接 OPUS 编码器）
+- 录音数据量：48k/2ch/16bit ≈ 192 KB/s（30 s ≈ 5.5 MB）；如需压缩后续接 OPUS 编码器
 
 ---
 

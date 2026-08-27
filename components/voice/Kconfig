@@ -48,6 +48,15 @@ config LERO_VOICE_RECORD_DEFAULT_SECONDS
     default 30
     range 1 600
 
+config LERO_VOICE_RECORD_MEM_BUF_KB
+    int "In-RAM record buffer size (KB, static PSRAM; 'rec' without SD)"
+    default 6144
+    range 512 12288
+    help
+        Static buffer used when recording without an SD card (console "rec"
+        with no path). 6 MB holds ~31 s at 48 kHz / 2 ch / 16 bit
+        (192000 B/s). Placed in PSRAM via SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY.
+
 config LERO_VOICE_RECORD_DEFAULT_PATH
     string "Default record output path (WAV on SD)"
     default "/sdcard/record/rec.wav"

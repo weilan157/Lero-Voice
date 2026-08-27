@@ -40,6 +40,7 @@
 #include "ota_service.h"
 #include "player.h"
 #include "voice.h"
+#include "voice_internal.h"
 #include "diag.h"
 #include "diag_internal.h"
 
@@ -311,17 +312,37 @@ static int cmd_play_dl(int argc, char **argv)
 static int cmd_rec(int argc, char **argv)
 {
     uint32_t seconds = (uint32_t)CONFIG_LERO_VOICE_RECORD_DEFAULT_SECONDS;
+    const uint32_t max_sec = (uint32_t)VOICE_RECORD_MEM_MAX_SECONDS;
     if (argc >= 2) {
         const int v = atoi(argv[1]);
-        if ((v < 1) || (v > 600)) {
-            printf("usage: rec [seconds 1-600]\n");
+        if ((v < 1) || ((uint32_t)v > max_sec)) {
+            printf("usage: rec [seconds 1-%u]  (in-RAM, no SD needed)\n",
+                   (unsigned)max_sec);
             return 1;
         }
         seconds = (uint32_t)v;
     }
+    /* NULL path → 内存录音（PSRAM），录完自动回放 */
     esp_err_t err = voice_record_start(seconds, NULL);
     printf("rec %u s: %s\n", (unsigned)seconds,
            (err == ESP_OK) ? "recording" : esp_err_to_name(err));
+    return 0;
+}
+
+static int cmd_play_mem(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    const uint8_t *buf = NULL;
+    size_t sz = 0U;
+    const esp_err_t get = voice_capture_get_rec_mem(&buf, &sz);
+    if (get != ESP_OK) {
+        printf("play-mem: no recording yet (run 'rec' first)\n");
+        return 1;
+    }
+    const esp_err_t err = player_play_mem(buf, sz);
+    printf("play-mem: %s (%u B from RAM)\n",
+           (err == ESP_OK) ? "playing" : esp_err_to_name(err), (unsigned)sz);
     return 0;
 }
 
@@ -653,7 +674,8 @@ esp_err_t diag_console_register(void)
         { .command = "play-loop",.help = "play <path> in loop until stop", .hint = NULL, .func = cmd_play_loop },
         { .command = "play-url", .help = "stream http(s) URL + loop play (no SD)", .hint = NULL, .func = cmd_play_url },
         { .command = "play-dl",  .help = "download http(s) URL to SD + loop play", .hint = NULL, .func = cmd_play_dl },
-        { .command = "rec",      .help = "record N s (default 30) to WAV + auto play", .hint = NULL, .func = cmd_rec },
+        { .command = "rec",      .help = "record N s to RAM WAV + auto play (no SD)", .hint = NULL, .func = cmd_rec },
+        { .command = "play-mem", .help = "play last in-RAM recording (no SD)", .hint = NULL, .func = cmd_play_mem },
         { .command = "rec-stop", .help = "stop recording early",        .hint = NULL, .func = cmd_rec_stop },
         { .command = "stop",     .help = "stop playback",               .hint = NULL, .func = cmd_stop },
         { .command = "pause",    .help = "pause playback",              .hint = NULL, .func = cmd_pause },
