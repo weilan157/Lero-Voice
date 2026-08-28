@@ -53,11 +53,13 @@ static esp_err_t s_gpio_init(void)
     if (err != ESP_OK) {
         return err;
     }
-    /* 复位脉冲：低≥1ms → 高，等待 5ms 后可用（PLAN 2.4.2d） */
+    /* 复位脉冲：低≥1ms → 高；FT6x36 手册要求复位释放后 **≥300 ms**
+     * 才能进行 I2C 通信（否则读 ID 失败 → 触摸无响应）。此前仅等 5ms
+     * 导致芯片未就绪即创建驱动（上板实测：触摸没反应）。 */
     (void)gpio_set_level(BSP_TOUCH_RST_GPIO, 0);
     vTaskDelay(pdMS_TO_TICKS(2U));
     (void)gpio_set_level(BSP_TOUCH_RST_GPIO, 1);
-    vTaskDelay(pdMS_TO_TICKS(5U));
+    vTaskDelay(pdMS_TO_TICKS(350U));
     return ESP_OK;
 }
 

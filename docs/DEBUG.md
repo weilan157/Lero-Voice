@@ -89,8 +89,9 @@ touch → pressed x=.. y=..（手指按下时）
 ```
 | 现象 | 排查 |
 |------|------|
-| not initialized | I2C1（IO46/47）、INT(IO2)、RST(IO48)；`i2c-scan` 查 0x38 |
-| 坐标错乱/镜像 | bsp_touch.c 的 swap_xy / mirror_x / mirror_y（旋转适配） |
+| 完全没反应（init 失败） | ① `i2c-scan` 查 0x38（I2C1：IO46/47）② **复位时序**：FT6x36 复位释放后须等 **≥300 ms** 才能 I2C 通信（bsp_touch.c 已按 350ms；曾因只等 5ms 导致芯片未就绪、触摸全程无响应）③ RST(IO48)/INT(IO2) 接线 |
+| not initialized | 启动日志 `touch ready: FT6336U @0x38` 未出现 → 见上 |
+| 坐标错乱/镜像 | bsp_touch.c 的 swap_xy / mirror_x / mirror_y（旋转适配）；方形屏上板对角触摸验证 |
 
 ### 3.4 RGB LCD（NV3052C，720×720）
 ```

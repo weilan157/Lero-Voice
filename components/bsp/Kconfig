@@ -68,6 +68,9 @@ config LERO_LCD_PIXEL_CLOCK_HZ
         H: HSW=60/HBP=120/HFP=106、V: VSW=4/VBP=20/VFP=20，PCLK 上升沿
         （上板实测显示正常，~20.8 fps）。31 MHz 超出面板 OTP 配置，
         会导致花屏/水平分裂/滚动。
+        刷新率 = PCLK / (720+HSW+HBP+HFP) / (720+VSW+VBP+VFP)。
+        面板 OTP 按周期数定义时序，提高 PCLK 可线性提高刷新率
+        （可试 20/24 MHz，需上板验证无花屏/滚动；如异常回退 16 MHz）。
 
 config LERO_LCD_HSYNC_PULSE
     int "LCD hsync pulse width (PCLK)"
