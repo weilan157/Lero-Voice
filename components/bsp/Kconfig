@@ -91,7 +91,15 @@ config LERO_LCD_VBP
 
 config LERO_LCD_VFP
     int "LCD vsync front porch (lines)"
-    default 50
+    default 100
+    help
+        Vertical timing. Symptom-based tuning (rolling picture means the
+        panel OTP's frame period differs from ours):
+        - picture rolls UP: increase total V lines (raise VFP or VBP)
+        - picture rolls DOWN: decrease total V lines
+        - Adafruit 5793 reference: VFP=50/VBP=16/pulse=16 (total 802);
+          our module still rolled up, so VFP raised to 100 (total 852,
+          ~23.3 fps). Tune locally with menuconfig (faster than CI).
 
 config LERO_LCD_BL_FREQ_HZ
     int "Backlight PWM frequency (Hz)"
