@@ -1027,6 +1027,16 @@ I2C:  SDA(IO0)/SCL(IO1) → ES8389 控制 (0x20)，与 QMI8658A(0x6A) 共用总�
 - **状态**：`VOICE_STATE_RECORDING`（`voice` 命令可查）；录音与聆听互斥（voice_task 串行）
 - 录音数据量：48k/2ch/16bit ≈ 192 KB/s（30 s ≈ 5.5 MB）；如需压缩后续接 OPUS 编码器
 
+### 6.4 蓝牙播放音乐（已实现，`components/bt_audio/`；Classic A2DP）
+
+- **方案**：**BT Classic A2DP Sink**（S31 支持 BT Classic，IDF commit 11268d8；BLE Audio LC3 为后续可选）。Bluedroid **内部解码 SBC**（legacy API `esp_a2d_sink_register_data_callback`）→ PCM 直写共享 `esp_codec_dev`（I2S → ES8389 → NS4150B）
+- **采样率**：跟随 A2DP SBC 协商（16/32/44.1/48 kHz，2ch/16bit）——`AUDIO_CFG_EVT` 解析 `mcc.sbc_info.samp_freq`，流开始时 `esp_codec_dev_open(rate)`（I2S/ES8389 自动切换，时钟系数表含全部档位）
+- **音频焦点（与本地播放互斥）**：流开始 → 若本地 player 在播先 `player_stop()` → 独占 codec；流停止/断开 → 关 codec + 功放静音
+- **初始化**：`esp_bt_controller`（BR/EDR only，释放 BLE 内存）+ Bluedroid + A2DP sink + GAP 可发现/可连接（上电即开，手机配对即播）
+- **控制**：`bt` 命令查状态（enabled/connected/streaming/codec/sample_rate）；console 提示 + 日志
+- **配置**：`CONFIG_BT_ENABLED` / `BTDM_CTRL_MODE_BR_EDR_ONLY` / `BT_BLUEDROID_ENABLED` / `BT_A2DP_ENABLE`
+- ⚠️ 上板实测项：蓝牙连接稳定性、44.1k 流播放质量（与 6.2 播放同链路）、与 Wi-Fi 共存（BT/Wi-Fi 天线分时）
+
 ---
 
 ## 7. 智能家居控制方案
