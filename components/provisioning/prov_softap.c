@@ -284,10 +284,18 @@ esp_err_t prov_softap_start(void)
 
     s_running = true;
     s_stop_requested = false;
+    TaskHandle_t created = xTaskCreateStaticPinnedToCore(
+        s_ap_task, "prov_ap", sizeof(s_task_stack), NULL,
+        AP_TASK_PRIORITY, s_task_stack, &s_task_tcb, AP_TASK_CORE);
+    if (created == NULL) {
+        ESP_LOGE(TAG, "ap task create failed");
+        s_running = false;
+        s_task_active = false;
+        (void)close(s_listen_fd);
+        s_listen_fd = -1;
+        return ESP_ERR_NO_MEM;
+    }
     s_task_active = true;
-    xTaskCreateStaticPinnedToCore(s_ap_task, "prov_ap", sizeof(s_task_stack), NULL,
-                                  AP_TASK_PRIORITY, s_task_stack, &s_task_tcb,
-                                  AP_TASK_CORE);
     ESP_LOGI(TAG, "softAP %s ready at http://192.168.4.1", s_ap_ssid);
     return ESP_OK;
 }

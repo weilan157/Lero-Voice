@@ -300,7 +300,9 @@ static esp_err_t s_run_uri(const char *uri, bool loop)
     return ESP_OK;
 }
 
-/* 停止当前播放并等待 STOPPED 事件落地（避免迟到事件误伤新流） */
+/* 停止当前播放并等待 STOPPED 事件落地（避免迟到事件误伤新流）。
+ * 停止后显式关闭 codec/功放：切歌可能换采样率/格式，不关则新流
+ * MUSIC_INFO 因 s_codec_open 仍为 true 而跳过重配（变速/噪声）。 */
 static void s_stop_current(void)
 {
     if (s_state != PLAYER_STATE_PLAYING && s_state != PLAYER_STATE_PAUSED) {
@@ -314,6 +316,13 @@ static void s_stop_current(void)
     }
     s_stop_requested = false;
     s_stop_acked = false;
+    /* 关 codec + 功放（不经过 s_finish：s_finish 会清 loop 状态与回调） */
+    if (s_codec_open) {
+        (void)esp_codec_dev_close(s_codec);
+        s_codec_open = false;
+    }
+    (void)bsp_amp_mute(true);
+    (void)bsp_amp_enable(false);
 }
 
 /* 控制任务：消费事件回调的请求（循环重播），避免 pipeline 任务重入 */

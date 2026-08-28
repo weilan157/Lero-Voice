@@ -582,6 +582,8 @@ components/bsp/
 | `diag_task` | 调试控制台 REPL、日志落盘、状态快照采样（1 s）、故障位图维护 | **1** | Core 0 | 4 KB | 串口输入 + 定时 |
 | （IDF 系统任务） | esp_timer / Wi-Fi / BT / IPC / MQTT 库内部 | 高 | Core 0 | 框架管理 | — |
 
+> **当前实现映射（2026-08-28，骨架阶段）**：`audio_task` = ESP-GMF asp 任务（`LERO_PLAYER_TASK_*`，prio 5/Core 默认）+ **`player_ctrl` 任务**（`LERO_PLAYER_CTRL_TASK_*`，prio 3/Core 1，循环重播控制，防 pipeline 任务重入）；`voice_task` = voice 组件（prio 15/Core 1）；`ui_task` = esp_lvgl_adapter 任务（prio 6）；蓝牙 A2DP 栈任务由 IDF BT 管理（BTDM 控制器 prio 高）；sensor/power/smarthome 任务待里程碑接入。`diag tasks` 命令可查全部任务水位。
+
 > 优先级说明：应用任务建议区间 **1~18**（最低 1 留给诊断任务，保证业务任务不饥饿），全部低于 IDF 系统任务（esp_timer/Wi-Fi/BT 等高位）；**同核任务优先级全局唯一、错开 1~2 档**，避免同优先级轮转抖动。数值为初始建议，M4 BSP 阶段用 `uxTaskGetStackHighWaterMark` 实测校准。
 
 #### 3.5.2 是否需要核绑定？—— 需要，按矩阵绑定
