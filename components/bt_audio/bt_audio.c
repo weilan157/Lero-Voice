@@ -154,10 +154,11 @@ static void s_a2dp_cb(esp_a2d_cb_event_t event, esp_a2d_cb_param_t *param)
             } else {
                 ESP_LOGE(TAG, "codec unavailable (player busy?); BT audio dropped");
             }
-        } else if (param->audio_stat.state == ESP_A2D_AUDIO_STATE_STOPPED) {
+        } else if (param->audio_stat.state == ESP_A2D_AUDIO_STATE_SUSPEND) {
+            /* 流暂停/停止（master 枚举仅 SUSPEND/STARTED，无 STOPPED） */
             s_streaming = false;
             s_close_codec();
-            ESP_LOGI(TAG, "A2DP streaming stopped");
+            ESP_LOGI(TAG, "A2DP stream suspended");
         }
         break;
     default:
