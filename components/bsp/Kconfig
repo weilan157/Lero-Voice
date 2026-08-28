@@ -62,15 +62,14 @@ config LERO_LCD_RGB666_ALIGN
 
 config LERO_LCD_PIXEL_CLOCK_HZ
     int "LCD pixel clock (Hz)"
-    default 16000000
+    default 46000000
     help
-        NV3052C 720x720 (ZJY400-8532ACT)。官方厂商源码时序：PCLK=16MHz、
-        H: HSW=60/HBP=120/HFP=106、V: VSW=4/VBP=20/VFP=20，PCLK 上升沿
-        （上板实测显示正常，~20.8 fps）。31 MHz 超出面板 OTP 配置，
-        会导致花屏/水平分裂/滚动。
+        NV3052C 720x720 (ZJY400-8532ACT)。厂商官方源码时序：H:
+        HSW=60/HBP=120/HFP=106、V: VSW=4/VBP=20/VFP=20，PCLK 上升沿。
+        上板实测：16MHz→20.8fps、**46MHz→59.8fps 显示正常（60fps 达成）**。
+        注意：46MHz 超出规格书标称上限（≤35.7MHz），实测可用但量产需
+        高低温/批量验证；异常时回退 16MHz（厂商默认值）。
         刷新率 = PCLK / (720+HSW+HBP+HFP) / (720+VSW+VBP+VFP)。
-        面板 OTP 按周期数定义时序，提高 PCLK 可线性提高刷新率
-        （可试 20/24 MHz，需上板验证无花屏/滚动；如异常回退 16 MHz）。
 
 config LERO_LCD_HSYNC_PULSE
     int "LCD hsync pulse width (PCLK)"
