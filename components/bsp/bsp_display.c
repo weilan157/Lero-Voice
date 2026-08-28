@@ -174,7 +174,9 @@ esp_err_t bsp_display_init(void)
             .vsync_pulse_width = CONFIG_LERO_LCD_VSYNC_PULSE,
             .vsync_back_porch = CONFIG_LERO_LCD_VBP,
             .vsync_front_porch = CONFIG_LERO_LCD_VFP,
-            .flags.pclk_active_neg = true,
+            /* NV3052C 720x720 在 PCLK 上升沿采样（Adafruit 5793 round40.py:
+             * pclk_active_high=True；官方 korvo 板为下降沿，本屏相反） */
+            .flags.pclk_active_neg = false,
         },
         .data_width = 16,
         .in_color_format = LCD_COLOR_FMT_RGB565,

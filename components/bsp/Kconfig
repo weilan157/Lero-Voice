@@ -62,31 +62,36 @@ config LERO_LCD_RGB666_ALIGN
 
 config LERO_LCD_PIXEL_CLOCK_HZ
     int "LCD pixel clock (Hz)"
-    default 31000000
+    default 16000000
+    help
+        NV3052C 720x720 (ZJY400-8532ACT, same IC as Adafruit 5793):
+        official Adafruit round40.py timing is 16 MHz with
+        H:2/44/46 V:16/16/50, pclk rising edge (~24.6 fps).
+        31 MHz exceeds the OTP-configured panel timing (split/scroll/ghost).
 
 config LERO_LCD_HSYNC_PULSE
     int "LCD hsync pulse width (PCLK)"
-    default 1
+    default 2
 
 config LERO_LCD_HBP
     int "LCD hsync back porch (PCLK)"
-    default 79
+    default 44
 
 config LERO_LCD_HFP
     int "LCD hsync front porch (PCLK)"
-    default 20
+    default 46
 
 config LERO_LCD_VSYNC_PULSE
     int "LCD vsync pulse width (lines)"
-    default 1
+    default 16
 
 config LERO_LCD_VBP
     int "LCD vsync back porch (lines)"
-    default 24
+    default 16
 
 config LERO_LCD_VFP
     int "LCD vsync front porch (lines)"
-    default 5
+    default 50
 
 config LERO_LCD_BL_FREQ_HZ
     int "Backlight PWM frequency (Hz)"
