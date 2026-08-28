@@ -57,7 +57,7 @@
 | **主控模块** | **ESP32-S31-WROOM-3-N16R16V** | RISC-V 双核 @ 320 MHz，16 MB Flash + 16 MB PSRAM，Wi-Fi 6 (802.11ax) + BLE 5.4 (LE Audio) + 802.15.4 + 千兆以太网 MAC，60 GPIO（模块引出 54），512 KB SRAM，最高 +85 °C | ✅ 已量产（2026-07） |
 | **音频 Codec** | **ES8389** | 24-bit / 8–96 kHz，DAC SNR 110 dB，立体声 ADC/DAC，双模拟麦输入，支持 DMIC 模式 | ✅ 原理图 U7 |
 | **音频功放** | **NS4150B × 2** | 3 W D 类功放，左右声道独立，CTRL 引脚使能（PA_CTRL） | ✅ 原理图 U10/U11 |
-| **屏幕** | 40-Pin RGB 并口 LCD（FPC：AFC24-S40FIA-00，0.5 mm 40P）| **模组 ZJY400-8532ACT**（4.0"，**720×720**，驱动 IC **NV3052CGRB**，触摸 **FT6336U**）| 18-bit RGB（DB0~DB17）+ DE/PCLK/HS/VS/RESET，背光 LEDA/LEDK（MP3302 升压），电容触摸（I2C 0x38）；**参数与驱动指南见 2.4.2d** |
+| **屏幕** | 40-Pin RGB 并口 LCD（FPC：AFC24-S40FIA-00，0.5 mm 40P）| **模组 ZJY400-8532ACT**（4.0"，**720×720**，驱动 IC **NV3052CGRB**，触摸 **FT6336U**）| 18-bit RGB（DB0~DB17）+ DE/PCLK/HS/VS/RESET，背光 LEDA/LEDK（MP3302 升压），电容触摸（I2C 0x48）；**参数与驱动指南见 2.4.2d** |
 | **麦克风** | 模拟麦克风 × 2（MIC1P/N、MIC2P/N → ES8389） | 型号待定（原理图已预留 0 Ω 选焊电阻） | ⚠️ 型号待定 |
 | **SD 卡** | MicroSD 卡座 XKTF-001B | 4-bit SDIO（SD_D0~D3/CLK/CMD）+ 卡检测 SD_DET | ✅ |
 | **IMU** | QMI8658A | 6 轴惯性测量，I2C 地址 0x6A，INT1/INT2 中断 —— 屏幕方向 / 手势唤醒 | ✅ 原理图 U12 |
@@ -254,7 +254,7 @@
 | 显示模式 | 常黑（Normally Black），全视角 |
 | 色彩 | **262K（18-bit RGB666）** |
 | 驱动 IC | **NV3052CGRB**（RAMless，无 GRAM —— 必须持续 RGB 数据流） |
-| 触摸 IC | **FT6336U**（电容触摸，I2C 从机地址 **0x38**，单点/两点） |
+| 触摸 IC | **FT6336U**（电容触摸，I2C 从机地址 **0x48**，单点/两点） |
 | 接口 | 并行 RGB 18-bit + 触摸 I2C |
 | 背光 | 8 LED（4 串 2 并），VF≈12.8 V，IF≈40 mA，**需外部升压驱动**（本板 MP3302，BL_EN=IO54 PWM 调光） |
 | 工作电压 VCI | 2.5~3.6 V（Typ. 3.3 V） |
@@ -291,7 +291,7 @@
 
 | 项 | 值 |
 |----|-----|
-| I2C 地址 | **0x38**（7-bit） |
+| I2C 地址 | **0x48**（7-bit；官方源码 8-bit 写 0x90 >> 1，上板实测） |
 | 中断 | TP_INT 下降沿（IO2，主控外部中断） |
 | 复位 | TP_RESET 拉高等待 ≥**300 ms** 后可用（IO48；FT6x36 手册要求复位释放后 ≥300ms 才能 I2C 通信，bsp_touch.c 已按 350ms） |
 | 触点数 | 单点/两点（非多点） |
@@ -302,7 +302,7 @@
 - 分辨率：**480×854 → 720×720**（Kconfig `LERO_LCD_H_RES/V_RES`、帧缓冲 720×720×2B×2≈2.1 MB PSRAM ✓ 16 MB 充足）
 - PCLK：16 MHz → **16 MHz（厂商源码值；31 MHz 会花屏，见上）**（Kconfig `LERO_LCD_PIXEL_CLOCK_HZ`）
 - 消隐期：**厂商源码值 H:60/120/106、V:4/20/20（上板显示正常）**
-- 触摸：按 FT6336U 地址 0x38 探测（BSP 目前未知地址，需上板扫描）
+- 触摸：按 FT6336U 地址 0x48（上板实测 2026-08-28；非 FT5x06 常见的 0x38）
 
 #### 2.4.2e LVGL 集成检查（2026-08-27，对照官方 S31 例程 `docs/ESP32_S31_20260711/`）
 
@@ -314,11 +314,11 @@
 - 官方参考代码：`docs/ESP32_S31_20260711/examples/common_components/esp32_s31_korvo/`（display.h：rotation/tear_avoid/缓冲配置；bsp_touch_new：GT1151 模式，可改为 FT5x06）
 
 **❌ 待补齐**（✅ 2026-08-27 已实现，`components/ui/` + bsp 适配，待 CI 编译验证）：
-1. ✅ **组件依赖**（main/idf_component.yml）：`espressif/esp_lvgl_adapter: ^0.5.0`（传递 LVGL v9 + esp_lcd_touch + freetype 等）+ `espressif/esp_lcd_touch_ft5x06: ^1.1.1`（**FT6336U 属 FT5x06 协议族，0x38 兼容**；依赖 esp_lcd_touch ^1.2.0）
+1. ✅ **组件依赖**（main/idf_component.yml）：`espressif/esp_lvgl_adapter: ^0.5.0`（传递 LVGL v9 + esp_lcd_touch + freetype 等）+ `espressif/esp_lcd_touch_ft5x06: ^1.1.1`（**FT6336U 属 FT5x06 协议族；本模组 I2C 地址 0x48（实测，宏默认 0x38 需覆盖）**；依赖 esp_lcd_touch ^1.2.0）
 2. ✅ **分辨率/时序**（bsp Kconfig）：720×720、PCLK 31 MHz、消隐 H:1/79/20、V:1/24/5（H_Blank=100、V_Blank=30，按规格书估算，上板核对）
 3. ✅ **LVGL 注册代码**（`components/ui/`，参照 korvo 组件）：
    - `esp_lv_adapter_register_display`：720×720、RGB565、`TEAR_AVOID_MODE_DOUBLE_FULL`（直接用 panel 2 个 PSRAM 帧缓冲，无需额外分配）
-   - `esp_lv_adapter_register_touch`：ft5x06（0x38、INT、RST）
+   - `esp_lv_adapter_register_touch`：ft5x06（0x48、INT、RST）
    - LVGL 任务 + 锁（adapter 提供）
 4. ✅ **触摸接入**：`bsp_touch` 改接 `esp_lcd_touch_ft5x06`（I2C1 400 kHz、IO2 中断、IO48 复位；bsp_i2c 新增 `get_bus1`）
 5. ✅ **颜色**：`CONFIG_LV_COLOR_DEPTH_16`（RGB565）+ `CONFIG_LV_MEM_CUSTOM`（IDF heap，PSRAM 可用）
@@ -329,7 +329,7 @@
 
 #### 2.4.3 触摸屏（电容触摸，I2C）
 
-> **触摸 IC：FT6336U**（地址 0x38，单点/两点，中断下降沿；控制参数见 **2.4.2d**）。当前 BSP 按 I2C1 + 中断 IO2 轮询/中断双模式设计。
+> **触摸 IC：FT6336U**（地址 0x48，单点/两点，中断下降沿；控制参数见 **2.4.2d**）。当前 BSP 按 I2C1 + 中断 IO2 轮询/中断双模式设计。
 
 | 信号 | 网络名 | 模块引脚 | GPIO |
 |------|--------|:--------:|:----:|
@@ -391,7 +391,7 @@
 |------|---------------------|-------------|----------|----------|
 | **ES8389 音频** | `esp_codec_dev` 2.x（espressif/esp-audio-dev 官方 es8389.c） | I2C0（IO0/IO1，**8-bit 0x20 = 7-bit 0x10**，i2c_master 总线用 7-bit 0x10）；I2S：SCLK=IO3、LRCK=IO4、SDOUT=IO5、DSDIN=IO6；**无 MCLK（BCLK PIN 模式）** | 48k/16bit/2ch；PA=IO52（bsp_amplifier） | console `codec`（寄存器 dump）、`periph` |
 | **QMI8658A IMU** | 自研轮询驱动（寄存器映射按 QMI8658A 手册，参考 esp-bsp 风格） | I2C0（0x6A/0x68 双地址探测） | accel ±4g/1kHz、gyro ±2048dps/1kHz | console `imu` |
-| **FT6336U 触摸** | `esp_lcd_touch_ft5x06` + `esp_lcd_touch`（esp-bsp 官方） | I2C1（IO46/IO47，0x38）；INT=IO2（下降沿）、RST=IO48（低有效） | 400 kHz；720×720 坐标 | console `touch` |
+| **FT6336U 触摸** | `esp_lcd_touch_ft5x06` + `esp_lcd_touch`（esp-bsp 官方） | I2C1（IO46/IO47，0x48）；INT=IO2（下降沿）、RST=IO48（低有效） | 400 kHz；720×720 坐标 | console `touch` |
 | **RGB LCD** | `esp_lcd` RGB 面板（esp-idf 官方，16-bit RGB565） | DB0~12=IO7~19、DB13~17=IO35~39、PCLK=IO40、DE=IO42、RESET=IO43、HS=IO44、VS=IO45、BL=IO54 | 720×720、PCLK 31 MHz、消隐 1/79/20、1/24/5；NV3052C（OTP，无 SPI 初始化） | `periph` + LVGL benchmark FPS |
 | **MicroSD** | `sdmmc` 4-bit（esp-idf 官方） | 模块专用 SDIO 引脚（D0~3/CLK/CMD） | — | console `sd` |
 | **storage 分区** | `spiffs`（esp-idf 官方） | — | 首启自动格式化 | `sd` |

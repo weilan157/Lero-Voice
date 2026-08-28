@@ -8,10 +8,15 @@
  * @file bsp_touch.c
  * @brief Capacitive touch controller FT6336U (I2C1: SDA=IO46 / SCL=IO47).
  *
- * FT6336U belongs to the FT5x06 protocol family (addr 0x38, single/two point),
+ * FT6336U belongs to the FT5x06 protocol family (single/two point),
  * driven via espressif/esp_lcd_touch_ft5x06 + esp_lcd_touch (managed
  * components). INT=IO2 (active low, falling edge), RST=IO48 (active low).
  * See docs/PLAN.md 2.4.3 / 2.4.2d.
+ *
+ * NOTE (上板实测 2026-08-28): 本模组触摸 I2C 地址为 **7-bit 0x48**
+ * （官方源码 8-bit 写地址 0x90 >> 1），并非 FT5x06 常见的 0x38。
+ * 组件宏 ESP_LCD_TOUCH_IO_I2C_FT5x06_CONFIG() 默认 0x38，必须显式覆盖
+ * io_cfg.dev_addr，否则读 ID 失败、触摸全程无响应。
  */
 
 #include "esp_log.h"
@@ -25,7 +30,9 @@
 
 #define TAG "bsp_touch"
 
-#define TOUCH_I2C_ADDR      0x38U   /* FT6336U（FT5x06 协议族） */
+#define TOUCH_I2C_ADDR      0x48U   /* FT6336U 本模组变体：7-bit 0x48
+                                     * （官方源码 8-bit 写 0x90 >> 1）；
+                                     * 非 FT5x06 常见的 0x38 */
 
 static esp_lcd_touch_handle_t s_touch;
 
@@ -83,6 +90,7 @@ esp_err_t bsp_touch_init(void)
     esp_lcd_panel_io_handle_t io = NULL;
     esp_lcd_panel_io_i2c_config_t io_cfg = ESP_LCD_TOUCH_IO_I2C_FT5x06_CONFIG();
     io_cfg.scl_speed_hz = BSP_I2C1_FREQ_HZ;
+    io_cfg.dev_addr = TOUCH_I2C_ADDR;   /* 覆盖宏默认 0x38 → 0x48（上板实测） */
     err = esp_lcd_new_panel_io_i2c(bus, &io_cfg, &io);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "touch panel io failed: %s", esp_err_to_name(err));

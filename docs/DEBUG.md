@@ -17,7 +17,7 @@ Lero Voice 0.1.0 boot (IDF v6.1)
 │   ├─ [bsp_codec]   ES8389 present @0x20      ← 或 "no ACK" 降级（见 3.1）
 │   ├─ [bsp_imu]     QMI8658A found @0x6A / imu ready
 │   ├─ [bsp_display] display 720x720 ready (backlight on)
-│   └─ [bsp_touch]   touch ready: FT6336U @0x38
+│   └─ [bsp_touch]   touch ready: FT6336U @0x48
 ├─ diag_init（console `lero>` + 日志落盘 + 快照）
 ├─ prov_init / ota_service_init / 按键事件接入
 ├─ player_init（ESP-GMF；codec 缺时降级）
@@ -45,7 +45,7 @@ Lero Voice 0.1.0 boot (IDF v6.1)
 | 命令 | 用途 |
 |------|------|
 | `periph` | **所有模块 init 状态位图**（ok / FAIL+错误码 / disabled）—— 第一眼判断 |
-| `i2c-scan` | 扫描 I2C0/I2C1 全地址，列出 ACK 设备（应见 0x20 / 0x6A·0x68 / 0x38） |
+| `i2c-scan` | 扫描 I2C0/I2C1 全地址，列出 ACK 设备（应见 0x20 / 0x6A·0x6B / 0x48） |
 | `reg <bus0\|bus1> <addr7> <reg>` | 任意 I2C 寄存器直读（十六进制）—— 驱动级万能工具 |
 | `codec` | ES8389 关键寄存器组 dump（时钟 REG0x02[7:6]、ADC/DAC/模拟） |
 | `imu` | QMI8658A accel(mg) / gyro(mdps) / temp(°C) |
@@ -89,8 +89,8 @@ touch → pressed x=.. y=..（手指按下时）
 ```
 | 现象 | 排查 |
 |------|------|
-| 完全没反应（init 失败） | ① `i2c-scan` 查 0x38（I2C1：IO46/47）② **复位时序**：FT6x36 复位释放后须等 **≥300 ms** 才能 I2C 通信（bsp_touch.c 已按 350ms；曾因只等 5ms 导致芯片未就绪、触摸全程无响应）③ RST(IO48)/INT(IO2) 接线 |
-| not initialized | 启动日志 `touch ready: FT6336U @0x38` 未出现 → 见上 |
+| 完全没反应（init 失败） | ① `i2c-scan` 查 0x48（I2C1：IO46/47）② **复位时序**：FT6x36 复位释放后须等 **≥300 ms** 才能 I2C 通信（bsp_touch.c 已按 350ms；曾因只等 5ms 导致芯片未就绪、触摸全程无响应）③ RST(IO48)/INT(IO2) 接线 |
+| not initialized | 启动日志 `touch ready: FT6336U @0x48` 未出现 → 见上 |
 | 坐标错乱/镜像 | bsp_touch.c 的 swap_xy / mirror_x / mirror_y（旋转适配）；方形屏上板对角触摸验证 |
 
 ### 3.4 RGB LCD（NV3052C，720×720）
@@ -134,7 +134,7 @@ ota-confirm（确认切换+重启）· ota-cancel（取消）
 ## 4. 上板调试顺序（推荐）
 
 1. 串口看启动日志 → `periph` 全模块状态位图
-2. `i2c-scan` → 确认 **0x20 / 0x6A·0x68 / 0x38** 三个设备在线（ES8389 no-ACK 为当前首要待解决项）
+2. `i2c-scan` → 确认 **0x10(ES8389) / 0x6A·0x6B / 0x48(触摸)** 三个设备在线（均已上板验证）
 3. `imu` → 验证 IMU（静止 z≈1000mg）
 4. 屏幕 → benchmark FPS 显示（同时验证显示 + LVGL 全链路）
 5. `touch` → 触摸链路
@@ -148,6 +148,6 @@ ota-confirm（确认切换+重启）· ota-cancel（取消）
 | 串口无输出 | CN2 连接（HC-1.25-4P）、波特率 115200、UART0=GPIO58/59 |
 | ES8389 no-ACK | AUD_3V3 / 0x20 / I2C0 上拉（见 3.1） |
 | 屏幕不亮 | OTP 未烧录 / 背光 / 时序（见 3.4） |
-| 触摸无效 | I2C1 / 0x38 / RST 时序（见 3.3） |
+| 触摸无效 | I2C1 / 0x48 / RST 时序（见 3.3） |
 | 播放无声 | codec 时钟源位 / I2S 引脚 / 功放（见 3.1） |
 | 电池电压异常 | ADC2-WiFi 共存 / 分压（见 3.6） |
