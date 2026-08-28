@@ -28,8 +28,8 @@
 #define TAG "prov_ap"
 
 #define AP_PORT             80
-#define REQ_BUF_SIZE        2048U
-#define AP_TASK_STACK_BYTES 4096U
+#define REQ_BUF_SIZE        1024U   /* ssid 32 + pass 64 URL 编码后 < 256 */
+#define AP_TASK_STACK_BYTES 6144U   /* req(1 KB) + esp_wifi 深调用链，原 4 KB 偏紧 */
 #define AP_TASK_PRIORITY    7
 #define AP_TASK_CORE        0
 
@@ -61,6 +61,7 @@ static int s_listen_fd = -1;
 static char s_ap_ssid[32];
 static StackType_t s_task_stack[AP_TASK_STACK_BYTES / sizeof(StackType_t)];
 static StaticTask_t s_task_tcb;
+static TaskHandle_t s_task_handle;               /* 用于 stop 自等短路判断 */
 static volatile bool s_stop_requested;  /* stop：请求 AP 任务退出 */
 static volatile bool s_task_active;     /* AP 任务存活（start 前须确认退出） */
 
@@ -216,6 +217,7 @@ static void s_ap_task(void *arg)
     /* 任务退出路径复位标志（供 start 复用静态 TCB/栈前确认） */
     s_running = false;
     s_task_active = false;
+    s_task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -291,11 +293,13 @@ esp_err_t prov_softap_start(void)
         ESP_LOGE(TAG, "ap task create failed");
         s_running = false;
         s_task_active = false;
+        s_task_handle = NULL;
         (void)close(s_listen_fd);
         s_listen_fd = -1;
         return ESP_ERR_NO_MEM;
     }
     s_task_active = true;
+    s_task_handle = created;
     ESP_LOGI(TAG, "softAP %s ready at http://192.168.4.1", s_ap_ssid);
     return ESP_OK;
 }
@@ -307,9 +311,14 @@ esp_err_t prov_softap_stop(void)
         (void)close(s_listen_fd);
         s_listen_fd = -1;
     }
-    /* 等待任务真正退出（最多 2 s），避免复用静态 TCB/栈创建新任务 */
-    for (int i = 0; (i < 200) && s_task_active; i++) {
-        vTaskDelay(pdMS_TO_TICKS(10U));
+    /* 等待任务真正退出（最多 2 s），避免复用静态 TCB/栈创建新任务。
+     * 若由 AP 任务自身调用（POST /save 路径），跳过自等（本任务退出前
+     * s_task_active 不会复位，否则固定卡 2 s）。 */
+    if ((s_task_handle != NULL) &&
+        (xTaskGetCurrentTaskHandle() != s_task_handle)) {
+        for (int i = 0; (i < 200) && s_task_active; i++) {
+            vTaskDelay(pdMS_TO_TICKS(10U));
+        }
     }
     s_stop_requested = false;
     (void)esp_wifi_stop();

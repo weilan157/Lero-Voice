@@ -145,12 +145,13 @@ static void s_a2dp_cb(esp_a2d_cb_event_t event, esp_a2d_cb_param_t *param)
             if (s_sample_rate == 0U) {
                 s_sample_rate = 44100U;   /* SBC 默认 */
             }
-            /* 音频焦点：停止本地播放器，独占 codec */
+            /* 音频焦点：阻塞式停止本地播放器（等 STOPPED 落地并释放
+             * codec），避免 player 迟到事件关闭 BT 刚打开的 codec */
             player_state_t pst = PLAYER_STATE_IDLE;
             if ((player_get_state(&pst) == ESP_OK) &&
                 ((pst == PLAYER_STATE_PLAYING) || (pst == PLAYER_STATE_PAUSED))) {
-                ESP_LOGI(TAG, "local player active, stopping it");
-                (void)player_stop();
+                ESP_LOGI(TAG, "local player active, stopping it (blocking)");
+                (void)player_stop_blocking();
             }
             if (s_open_codec(s_sample_rate) == ESP_OK) {
                 s_streaming = true;

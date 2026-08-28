@@ -56,6 +56,10 @@ static void s_ring_append(const char *data, size_t len)
 
 static void s_pending_append(const char *data, size_t len)
 {
+    /* 写盘期间丢弃（ring 仍保留）：避免与 fwrite 同缓冲并发导致撕裂 */
+    if (s_flushing) {
+        return;
+    }
     if ((s_pending_len + len) <= PENDING_FLUSH_SIZE) {
         (void)memcpy(&s_pending[s_pending_len], data, len);
         s_pending_len += len;
@@ -65,6 +69,7 @@ static void s_pending_append(const char *data, size_t len)
 /* 日志 hook 会在任意任务上下文被调用：ring/pending 共享缓冲
  * 用自旋锁保护（短临界区，避免多任务并发写撕裂） */
 static portMUX_TYPE s_log_lock = portMUX_INITIALIZER_UNLOCKED;
+static volatile bool s_flushing;    /* 写盘期间为 true（hook 跳过 pending） */
 
 static int s_vprintf_hook(const char *fmt, va_list args)
 {
@@ -122,13 +127,16 @@ static void s_write_pending_to_file(const char *path)
             return;
         }
     }
-    /* 临界区取出待刷数据（写文件期间 hook 继续 append 到新缓冲） */
+    /* 临界区取出待刷数据；写盘期间置 s_flushing 阻止 hook 追加
+     * （无双缓冲，防止 fwrite 与 hook 写同缓冲撕裂） */
     portENTER_CRITICAL(&s_log_lock);
     const size_t flush_len = s_pending_len;
     s_pending_len = 0U;
+    s_flushing = true;
     portEXIT_CRITICAL(&s_log_lock);
     (void)fwrite(s_pending, 1U, flush_len, f);
     (void)fclose(f);
+    s_flushing = false;
 }
 
 esp_err_t diag_log_flush(void)

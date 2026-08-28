@@ -96,6 +96,15 @@ esp_err_t player_play_url(const char *url);
 esp_err_t player_stop(void);
 
 /**
+ * @brief Stop playback synchronously: waits for the STOPPED event to land
+ *        and closes the codec/amplifier. For audio-focus preemption (e.g.
+ *        BT A2DP take-over) — guarantees the old stream is fully released
+ *        before the new owner opens the codec.
+ * @return ESP_OK on success.
+ */
+esp_err_t player_stop_blocking(void);
+
+/**
  * @brief Pause playback.
  * @return ESP_OK on success.
  */

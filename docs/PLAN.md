@@ -8,7 +8,7 @@
 |------|------|
 | 文档版本 | v3.3（2026） |
 | 依据 | 原理图 `docs/SCH_Schematic1_1_2026-08-25.pdf`（引脚映射逐网络核实）、ESP32-S31 官方产品页与数据手册、ESP 组件库现状 |
-| 状态 | 硬件选型 ✅ 原理图 ✅ → PCB 进行中 / BSP 待启动 |
+| 状态 | 硬件选型 ✅ 原理图 ✅ 固件 **BSP + 音频 + 显示 + 蓝牙已实现（CI 验证）** → 上板联调中（显示/音频/触摸实测校准） |
 
 ---
 
@@ -428,6 +428,7 @@
 | 9 | ✅ **ES8389 I2C 地址语义（上板实测 2026-08-28）**：原理图标注 0x20 是 **8-bit 写地址**（与官方驱动 `ES8389_CODEC_DEFAULT_ADDR` 一致），芯片实际挂在 **7-bit 0x10**；esp_codec_dev ctrl 层内部 `>>1`（audio_codec_ctrl_i2c.c）用 0x20 正确，但 BSP 自写探测曾把 0x20 直接当 7-bit 用导致 no-ACK | **已修复**：bsp_config.h 区分 `BSP_ES8389_I2C_ADDR`（8-bit 0x20，esp_codec_dev 用）与 `BSP_ES8389_I2C_ADDR_7BIT`（7-bit 0x10，i2c_master 总线/探测/i2c-scan 用）；`i2c-scan` 实测芯片在 0x10 |
 | 10 | ✅ **驱动全面审查（2026-08-28，对照官方 korvo BSP + esp_codec_dev 2.0.0-beta3 源码 + 数据手册）**：修复——ADC 换算改官方 17-bit/2000 mV 理想权重模型（原 12-bit/3300 假设错 ~32 倍）；RGB565→18-bit 面板**位对齐重排**（各通道高位对齐，DB0/DB12 拉低，防颜色串位）；SD 引脚显式 GPIO20~25 + 内部上拉；I2C0 400k→100k（官方 S31 测试板结论）；IMU 兜底地址 0x68→0x6B；播放单声道→立体声（CH_CVT_EN）；esp_codec_dev 版本精确锁定 2.0.0-beta3；充电判定加 ADC 饱和启发；分压比注释风险 | **上板实测项**：ADC2 与 Wi-Fi 共存、触摸轴方向（swap/mirror）、I2S dout/din 实际走线方向、模组 OTP 接口位宽（16/18-bit）与纯色验证、LCD 刷新率 ~50 Hz 可接受性、分压电阻实际值 |
 | 11 | ✅ **内存/驱动专项审查（2026-08-28，对照 esp-gmf/官方示例源码）**：修复——player 切歌竞态（代次 + stop 等 STOPPED 落地 + 陈旧事件窗口抑制）、循环重播移出事件回调（新增 player_ctrl 静态任务防 pipeline 重入）、prov_softap 任务生命周期（recv 超时轮询退出/start 前确认退出）、main 事件队列非本任务事件放回、bt_audio codec_open volatile、probe/i2s 失败回滚（rm_device/del_channel）、memfs 先停后换数据、diag_log 临界区；GMF pipeline 复用无泄漏（仅首次创建）、esp_http_client 三处 init/perform/cleanup 配对 ✓ | **剩余待办**：#8 touch/display 失败句柄清理；#9 下载共享状态加互斥；#11 voice/codec 焦点仲裁（区分 EBUSY 与真错误）；#13 BT/voice 音频焦点统一仲裁；#14 provisioning WiFi 事件回调内重操作改任务化；#15-20 低项（adc/buttons/console/ota/ui/bus deinit 错误路径清理） |
+| 12 | ✅ **第三轮方案一致性审查（2026-08-28，PLAN vs 代码 + 重构正确性）**：修复——MUSIC_INFO **无条件按最新 fs 重配**（防切歌陈旧 info 以旧采样率开 codec）；ERROR 事件陈旧窗口抑制（与 STOPPED 同 250ms）；s_loop_pending 在 run 时作废 + 控制任务重播前校验状态（防陈旧重播覆盖新切歌）；**player_stop_blocking 公开**（BT 焦点抢占握手，防 player 迟到 STOPPED 关 BT codec）；diag_log 写盘 s_flushing 防同缓冲撕裂；softAP stop 自等短路（POST /save 路径）+ req 1024/栈 6 KB；CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192（BT init 在 app_main）；文档同步（状态行/6.2 循环语义/esp_lvgl_adapter 示例） | **剩余待办**：player 控制路径互斥（s_play_uri 临界区，涉及 voice/dl/BT 多调用者）；codec 占用者 token（音频焦点三方仲裁 P1）；OTA"3 次未确认回滚"文档语义与实现对齐（现仅 bootloader PENDING_VERIFY）；文档 esp_codec_dev 版本描述统一 2.0.0-beta3；CH_CVT_EN 等 sdkconfig 符号构建后验证；flash 尺寸（BT 加入后 3.8MB 上限）与 512KB SRAM 预算上板实测（`mem`/`tasks`）；LVGL MALLOC_CAP_SPIRAM 显式化 |
 
 ---
 
@@ -629,22 +630,25 @@ POWER_ON → bsp_init → 自检(失败位图→诊断页)
 
 ### 3.6 关键集成代码
 
-**显示（LVGL v9 + esp_lvgl_port，真实 API）**
+**显示（LVGL v9 + esp_lvgl_adapter，S31 官方方案，真实 API——见 2.4.2e / ui.c）**
 
 ```c
-// idf.py add-dependency "lvgl/lvgl^9.2.0"
-// idf.py add-dependency "espressif/esp_lvgl_port^2.3.0"
+// idf.py add-dependency "lvgl/lvgl^9.5.0"
+// idf.py add-dependency "espressif/esp_lvgl_adapter^0.5.0"
 
-#include "esp_lvgl_port.h"
+#include "esp_lv_adapter.h"
 
-const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
-lvgl_port_init(&lvgl_cfg);
-// esp_lcd RGB 面板初始化后：
-lvgl_port_display_cfg_t disp_cfg = { ... };   // 分辨率/颜色格式等
-lvgl_port_add_disp(&disp_cfg);
+esp_lv_adapter_config_t acfg = ESP_LV_ADAPTER_DEFAULT_CONFIG();
+esp_lv_adapter_init(&acfg);
+// esp_lcd RGB 面板初始化后（DOUBLE_FULL 直接用面板双帧缓冲）：
+esp_lv_adapter_display_config_t dcfg =
+    ESP_LV_ADAPTER_DISPLAY_RGB_DEFAULT_CONFIG(panel, NULL, h, v, ESP_LV_ADAPTER_ROTATE_0);
+dcfg.tear_avoid_mode = ESP_LV_ADAPTER_TEAR_AVOID_MODE_DOUBLE_FULL;
+lv_display_t *disp = esp_lv_adapter_register_display(&dcfg);
 // 触摸 (esp_lcd_touch) 初始化后：
-lvgl_port_touch_cfg_t touch_cfg = { ... };
-lvgl_port_add_touch(&touch_cfg);
+esp_lv_adapter_touch_config_t tcfg = ESP_LV_ADAPTER_TOUCH_DEFAULT_CONFIG(disp, touch_handle);
+esp_lv_adapter_register_touch(&tcfg);
+esp_lv_adapter_start();
 ```
 
 **音频（esp_codec_dev + ES8389，esp_codec_dev ≥ v1.3.6 已官方支持）**
@@ -1017,7 +1021,7 @@ I2C:  SDA(IO0)/SCL(IO1) → ES8389 控制 (0x20)，与 QMI8658A(0x6A) 共用总�
 - **管线**：SD 文件（`file://sdcard/...` URI）→ **esp_audio_simple_player**（ESP-GMF 解码 + 采样率/声道/位深转换）→ PCM 输出回调 → **esp_codec_dev**（ES8389，I2S 主模式，引脚见 2.4.1）
 - **格式**：mp3 / wav / flac / aac / amr / m4a / opus（按文件扩展名自动选择解码器，menuconfig 可裁剪以省 Flash）
 - **API**：`player_play_file(path)` / `player_play_loop(path)`（FINISHED 自动重播，`stop` 终止）/ `player_play_http(url)`（**HTTP(S) 流式播放**：esp_audio_simple_player 按 URI scheme 选 IO，`http://` 走 HTTP stream，无需 SD 卡，循环）/ `player_play_url(url)`（HTTP(S) 下载到 SD 后循环播放，静态下载任务 + esp_http_client 流式落盘，文件名取 URL basename、无扩展名补 .mp3）/ `player_stop` / `player_pause` / `player_resume` / `player_set_volume` / `player_get_state` + 状态事件回调
-- **codec 生命周期**：收到 `MUSIC_INFO` 事件（采样率/声道/位深）→ `esp_codec_dev_open` → 功放使能；`STOPPED/FINISHED/ERROR` → 关 codec → 功放关闭（防爆音，3.3.1 #3）；循环模式跨曲保持打开
+- **codec 生命周期**：收到 `MUSIC_INFO` 事件（采样率/声道/位深）→ **无条件按最新 fs 重配**（close+open，防切歌陈旧 info 误导）→ 功放使能；`STOPPED/FINISHED/ERROR` → 关 codec → 功放关闭（防爆音，3.3.1 #3）；**循环模式每次重播完整重开**（I2S 停止→重启时钟间隙会使 BCLK PIN 模式 ES8389 失锁产生噪声，故不跨曲保持打开）
 - **控制入口**：diag console 命令 `play / play-loop / play-url（HTTP 流式）/ play-dl（下载）/ stop / pause / resume / vol / player`；后续接 UI 与语音意图
 - ✅ **无需 MCLK**：ES8389 采用官方驱动的 **BCLK PIN 模式**（`no_mclk=true`，REG0x02[7:6]=01，时钟从 I2S BCLK 派生；驱动按 BCLK=fs×bits×2 查 coeff_div 系数表，16bit/2ch 时 BCLK=32×fs 与表匹配）。原理图 pin4(MCLK/TDMIN) 与 DACDAT 短接共接 I2S_DSDIN 为省 MCLK 设计，BCLK 模式下无影响。上板实测项：`es8389_codec_cfg_t` 子配置（`sys_cfg.is_master=false` 从模式、`no_mclk=true`、`adc_cfg` 模拟麦、`pa_cfg.pa_pin=-1` 交由 bsp_amplifier 防双控；I2S 双通道 TX+RX 支持录音）
 
