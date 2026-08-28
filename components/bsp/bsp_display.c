@@ -39,14 +39,15 @@ static bool s_initialized;
 
 static void s_fill_data_gpios(gpio_num_t data[ESP_LCD_RGB_BUS_WIDTH_MAX])
 {
+#if CONFIG_LERO_LCD_RGB666_ALIGN
     /* 18-bit RGB666 面板（DB0~5=B、DB6~11=G、DB12~17=R，PLAN 2.4.2d）用
      * 16-bit RGB565 直驱时的位对齐：RGB565 各通道**高位对齐**面板对应
      * 通道高位（低位缺失，DB0/DB12 悬空拉低）——
      * 否则 G0 会落进 DB5(B5)、R0 落进 DB11(G5) 造成颜色通道串位。
      * RGB565 位序（IDF RGB panel 16-bit）：data[0..4]=B4..B0,
      * data[5..10]=G5..G0, data[11..15]=R4..R0。
-     * 若模组 OTP 实为 16-bit RGB 接口（IC 内重映射），需改回直连映射；
-     * 上板用纯色测试条验证（见 PLAN 2.4.2d）。 */
+     * 若模组 OTP 实为 16-bit RGB 接口（IC 内重映射），关闭该开关
+     * 使用直连映射；上板用纯色测试条验证（PLAN 2.4.2d / 2.6 #10）。 */
     data[0] = BSP_LCD_DB1_GPIO;     /* B0 -> DB1  */
     data[1] = BSP_LCD_DB2_GPIO;     /* B1 -> DB2  */
     data[2] = BSP_LCD_DB3_GPIO;     /* B2 -> DB3  */
@@ -78,6 +79,25 @@ static void s_fill_data_gpios(gpio_num_t data[ESP_LCD_RGB_BUS_WIDTH_MAX])
             (void)gpio_set_level(unused[i], 0);
         }
     }
+#else
+    /* 直连映射：模组 OTP 为 16-bit RGB 接口时（DB0~15 即 RGB565 位序） */
+    data[0] = BSP_LCD_DB0_GPIO;
+    data[1] = BSP_LCD_DB1_GPIO;
+    data[2] = BSP_LCD_DB2_GPIO;
+    data[3] = BSP_LCD_DB3_GPIO;
+    data[4] = BSP_LCD_DB4_GPIO;
+    data[5] = BSP_LCD_DB5_GPIO;
+    data[6] = BSP_LCD_DB6_GPIO;
+    data[7] = BSP_LCD_DB7_GPIO;
+    data[8] = BSP_LCD_DB8_GPIO;
+    data[9] = BSP_LCD_DB9_GPIO;
+    data[10] = BSP_LCD_DB10_GPIO;
+    data[11] = BSP_LCD_DB11_GPIO;
+    data[12] = BSP_LCD_DB12_GPIO;
+    data[13] = BSP_LCD_DB13_GPIO;
+    data[14] = BSP_LCD_DB14_GPIO;
+    data[15] = BSP_LCD_DB15_GPIO;
+#endif /* CONFIG_LERO_LCD_RGB666_ALIGN */
 }
 
 static esp_err_t s_reset_panel_gpio(void)

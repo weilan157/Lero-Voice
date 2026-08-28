@@ -27,6 +27,10 @@
 #include "esp_bt.h"
 #include "esp_bt_main.h"
 #include "esp_gap_bt_api.h"
+/* 新 API 头：esp_a2d_mcc_t / esp_a2d_cb_event_t / esp_a2d_register_callback /
+ * esp_a2d_sink_init；legacy 头：esp_a2d_sink_register_data_callback（PCM 输出，
+ * Bluedroid 内部解 SBC）。两者共存，勿用 legacy 头里的旧类型。 */
+#include "esp_a2dp_api.h"
 #include "esp_a2dp_legacy_api.h"
 #include "esp_codec_dev.h"
 #include "bsp_codec.h"
@@ -91,7 +95,8 @@ static void s_pcm_data(const uint8_t *buf, uint32_t len)
     if (!s_codec_open || (buf == NULL) || (len == 0U)) {
         return;
     }
-    (void)esp_codec_dev_write(s_codec, buf, len);
+    /* esp_codec_dev_write 不修改数据；显式丢弃 const（API 无 const） */
+    (void)esp_codec_dev_write(s_codec, (void *)buf, (int)len);
 }
 
 static uint32_t s_rate_from_mcc(const esp_a2d_mcc_t *mcc)

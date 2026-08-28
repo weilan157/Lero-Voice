@@ -48,6 +48,18 @@ config LERO_LCD_V_RES
     int "LCD vertical resolution (px)"
     default 720
 
+config LERO_LCD_RGB666_ALIGN
+    bool "RGB565 → 18-bit RGB666 panel bit alignment (high-bits)"
+    default y
+    help
+        ZJY400-8532ACT is an 18-bit RGB666 panel (DB0~5=B, DB6~11=G,
+        DB12~17=R) but the S31 esp_lcd RGB driver only supports 16-bit
+        data width, so RGB565 bits are routed with each channel's high
+        bits aligned to the panel's high bits (DB0/DB12 left floating low).
+        If the module OTP is actually programmed for a 16-bit RGB
+        interface (IC-internal remap), disable this and use the direct
+        DB0~15 mapping instead. Verify with solid-color test patterns.
+
 config LERO_LCD_PIXEL_CLOCK_HZ
     int "LCD pixel clock (Hz)"
     default 31000000
