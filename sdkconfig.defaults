@@ -57,3 +57,7 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 # 播放端单声道 → 立体声（ESP-GMF 通道转换；BCLK PIN 模式按立体声查
 # 系数表，单声道流会 BCLK 减半变调——官方测试板同样先转立体声）
 CONFIG_ESP_AUDIO_SIMPLE_PLAYER_CH_CVT_EN=y
+# 关闭 44.1k→48k 重采样：蓝牙 A2DP 已验证 44.1kHz 直出（APLL 精确合成
+# BCLK）干净无杂音，本地经重采样器反而出现杂音——去掉该环节，
+# 各采样率直出（I2S/ES8389 按源 fs 重配，系数表覆盖 8/16/44.1/48k）
+CONFIG_ESP_AUDIO_SIMPLE_PLAYER_RESAMPLE_EN=n
