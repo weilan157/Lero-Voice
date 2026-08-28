@@ -91,10 +91,12 @@ static esp_err_t s_i2s_init(void)
             },
         },
     };
-    /* 时钟源用音频 PLL（APLL）：XTAL 40MHz 无法整除 44.1kHz 系时钟
-     * （MCLK 11.2896MHz），默认时钟源分频抖动大（~91%），播放/蓝牙
-     * 44.1kHz 音频出现杂音失真——上板实测 APLL 修复（48k 同理受益） */
-    std_cfg.clk_cfg.clk_src = I2S_CLK_SRC_APLL;
+    /* 初始时钟用默认源（不占 APLL）：APLL 只有一路，若在此处以 48k
+     * enable 常驻，之后 44.1k 打开时 APLL 被锁（"APLL is occupied"），
+     * 只能凑合 → 35% 抖动杂音（上板实测）。APLL 由 esp_codec_dev 在
+     * 每次 open/set_fmt 时按实际采样率精确配置（audio_codec_i2s_cfg_t
+     * .clk_src=APLL），且由 data_if 按需 enable 通道——此处不提前
+     * enable，避免锁定 APLL 频率。 */
     std_cfg.clk_cfg.mclk_multiple = CODEC_MCLK_MULTIPLE;
     err = i2s_channel_init_std_mode(s_i2s_tx, &std_cfg);
     if (err != ESP_OK) {
@@ -106,16 +108,8 @@ static esp_err_t s_i2s_init(void)
         ESP_LOGE(TAG, "i2s rx std init failed: %s", esp_err_to_name(err));
         goto fail;
     }
-    err = i2s_channel_enable(s_i2s_tx);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "i2s tx enable failed: %s", esp_err_to_name(err));
-        goto fail;
-    }
-    err = i2s_channel_enable(s_i2s_rx);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "i2s rx enable failed: %s", esp_err_to_name(err));
-        goto fail;
-    }
+    /* 不在此处 i2s_channel_enable：通道使能与 APLL 频率配置由
+     * esp_codec_dev 的 data_if 在 open/read/write 时完成 */
     ESP_LOGI(TAG, "i2s ready (sclk=%d ws=%d dout=%d din=%d, no mclk: BCLK PIN mode)",
              (int)BSP_I2S_SCLK_GPIO, (int)BSP_I2S_LRCK_GPIO,
              (int)BSP_I2S_DSDIN_GPIO, (int)BSP_I2S_SDOUT_GPIO);
