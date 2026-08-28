@@ -141,13 +141,18 @@ esp_err_t bsp_display_init(void)
         .num_fbs = 2,
         .user_fbs = { s_fb0, s_fb1 },
         .bounce_buffer_size_px = 0,
-        .dma_burst_size = 64,
+        .dma_burst_size = 128,
         .hsync_gpio_num = BSP_LCD_HS_GPIO,
         .vsync_gpio_num = BSP_LCD_VS_GPIO,
         .de_gpio_num = BSP_LCD_DE_GPIO,
         .pclk_gpio_num = BSP_LCD_PCLK_GPIO,
         .disp_gpio_num = -1,
-        .flags = { 0 },
+        /* fb 在 PSRAM（EXT_RAM_BSS_ATTR）：必须告知驱动走 PSRAM 路径
+         * （官方 korvo BSP 同 S31 芯片亦设 fb_in_psram=true），否则
+         * DMA 按内部 SRAM fb 处理，屏幕无输出（背光亮但全黑） */
+        .flags = {
+            .fb_in_psram = true,
+        },
     };
     s_fill_data_gpios(cfg.data_gpio_nums);
 
