@@ -294,6 +294,10 @@ static esp_err_t s_run_uri(const char *uri, bool loop)
     if (gerr != ESP_GMF_ERR_OK) {
         ESP_LOGE(TAG, "run %s failed: %d", uri, (int)gerr);
         s_loop = false;
+        s_state = PLAYER_STATE_ERROR;   /* 状态复位（切歌失败不得残留 PLAYING） */
+        if (s_cb != NULL) {
+            s_cb(s_state, NULL);
+        }
         return ESP_FAIL;
     }
     ESP_LOGI(TAG, "playing %s%s", uri, loop ? " (loop)" : "");
