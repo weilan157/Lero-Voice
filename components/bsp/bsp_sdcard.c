@@ -15,6 +15,7 @@
 #include "esp_log.h"
 #include "sdmmc_cmd.h"
 #include "driver/sdmmc_host.h"
+#include "driver/sdmmc_types.h"
 #include "esp_vfs_fat.h"
 #include "ff.h"
 #include "bsp_sdcard.h"
@@ -37,6 +38,18 @@ esp_err_t bsp_sdcard_mount(void)
     }
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     sdmmc_slot_config_t slot = SDMMC_SLOT_CONFIG_DEFAULT();
+    /* S31 的 SDMMC 走 GPIO 矩阵，默认宏展开不可靠：仿官方 korvo BSP
+     * 显式指定模块专用 SD 引脚（CLK=IO24/CMD=IO25/D0~D3=IO20~23，
+     * PLAN 2.4.2c 管脚表），并启用内部上拉 */
+#ifdef CONFIG_SOC_SDMMC_USE_GPIO_MATRIX
+    slot.clk = BSP_SD_CLK_GPIO;
+    slot.cmd = BSP_SD_CMD_GPIO;
+    slot.d0 = BSP_SD_D0_GPIO;
+    slot.d1 = BSP_SD_D1_GPIO;
+    slot.d2 = BSP_SD_D2_GPIO;
+    slot.d3 = BSP_SD_D3_GPIO;
+    slot.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
+#endif /* CONFIG_SOC_SDMMC_USE_GPIO_MATRIX */
     esp_vfs_fat_mount_config_t mount_cfg = {
         .format_if_mount_failed = false,
         .max_files = 8,

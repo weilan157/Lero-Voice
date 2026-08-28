@@ -426,6 +426,7 @@
 | 7 | ⚠️ **IMU 地址脚 SA0 悬空**：SDO/SA0 未接，地址依赖内部默认（原理图标注 0x6A） | **已实现**：初始化先探测 0x6A / 0x68 再锁定（bsp_imu.c） |
 | 8 | ⚠️ **ADC 通道映射与衰减（上板实测确认）**：GPIO50/51 属 **ADC2**（CH0/CH1；ADC1 仅 GPIO42~49）；S31 为新一代 SAR ADC（17-bit、差分），`SOC_ADC_ATTEN_NUM=1` 仅 `ADC_ATTEN_DB_0` 合法（`DB_11` 编译期不存在、`DB_12` 运行时报 invalid attenuation，官方 oneshot 示例同此处理） | 已按 ADC2 + DB_0 修正；ADC2 与 Wi-Fi 活跃时的共存性需上板实测（若读数异常改用 ADC1 引脚或连续采样） |
 | 9 | ✅ **ES8389 I2C 地址语义（上板实测 2026-08-28）**：原理图标注 0x20 是 **8-bit 写地址**（与官方驱动 `ES8389_CODEC_DEFAULT_ADDR` 一致），芯片实际挂在 **7-bit 0x10**；esp_codec_dev ctrl 层内部 `>>1`（audio_codec_ctrl_i2c.c）用 0x20 正确，但 BSP 自写探测曾把 0x20 直接当 7-bit 用导致 no-ACK | **已修复**：bsp_config.h 区分 `BSP_ES8389_I2C_ADDR`（8-bit 0x20，esp_codec_dev 用）与 `BSP_ES8389_I2C_ADDR_7BIT`（7-bit 0x10，i2c_master 总线/探测/i2c-scan 用）；`i2c-scan` 实测芯片在 0x10 |
+| 10 | ✅ **驱动全面审查（2026-08-28，对照官方 korvo BSP + esp_codec_dev 2.0.0-beta3 源码 + 数据手册）**：修复——ADC 换算改官方 17-bit/2000 mV 理想权重模型（原 12-bit/3300 假设错 ~32 倍）；RGB565→18-bit 面板**位对齐重排**（各通道高位对齐，DB0/DB12 拉低，防颜色串位）；SD 引脚显式 GPIO20~25 + 内部上拉；I2C0 400k→100k（官方 S31 测试板结论）；IMU 兜底地址 0x68→0x6B；播放单声道→立体声（CH_CVT_EN）；esp_codec_dev 版本精确锁定 2.0.0-beta3；充电判定加 ADC 饱和启发；分压比注释风险 | **上板实测项**：ADC2 与 Wi-Fi 共存、触摸轴方向（swap/mirror）、I2S dout/din 实际走线方向、模组 OTP 接口位宽（16/18-bit）与纯色验证、LCD 刷新率 ~50 Hz 可接受性、分压电阻实际值 |
 
 ---
 

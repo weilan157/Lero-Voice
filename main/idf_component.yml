@@ -3,7 +3,9 @@
 ## NOTE: IDF v6.1 起 manifest 需放在组件目录（main/）内，且依赖不再随
 ## cmake 自动拉取 —— 构建前执行 `idf.py update-dependencies`。
 dependencies:
-  espressif/esp_codec_dev: "^1.6.2"            # ES8389 官方驱动（播放+录音）
+  # bsp_codec.c 按 2.0.x 子配置结构（es8389_codec_cfg_t）编写——
+  # 精确锁定 2.0.0-beta3，避免 ^1.x 解析到 v1 平铺 API 导致编译失败
+  espressif/esp_codec_dev: "2.0.0-beta3"        # ES8389 官方驱动（播放+录音）
   espressif/esp_audio_simple_player: "^1.0.0~2" # ESP-GMF 播放器（MP3/WAV/FLAC/AAC...）
   espressif/esp_lvgl_adapter: "^0.5.0"         # S31 官方 LVGL 适配器（PLAN 2.4.2e）
   espressif/esp_lcd_touch_ft5x06: "^1.1.1"     # FT6336U 触摸（FT5x06 协议族）

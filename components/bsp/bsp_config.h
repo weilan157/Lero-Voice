@@ -26,7 +26,9 @@ extern "C" {
 /* ---------------- I2C0: ES8389 codec + QMI8658A IMU (PLAN 2.4.1) -------- */
 #define BSP_I2C0_SDA_GPIO           GPIO_NUM_0
 #define BSP_I2C0_SCL_GPIO           GPIO_NUM_1
-#define BSP_I2C0_FREQ_HZ            400000U
+/* 官方 S31 测试板注释：ES8389 需较慢 I2C 时钟才可靠（其用 10 kHz）。
+ * 本板 100 kHz 折中（400 kHz 在长走线/仅内部上拉时寄存器写偶发失败）。 */
+#define BSP_I2C0_FREQ_HZ            100000U
 
 /* ---------------- I2C1: capacitive touch (PLAN 2.4.3) ------------------- */
 #define BSP_I2C1_SDA_GPIO           GPIO_NUM_46
@@ -74,8 +76,15 @@ extern "C" {
 #define BSP_LCD_VS_GPIO             GPIO_NUM_45
 #define BSP_LCD_BL_GPIO             GPIO_NUM_54
 
-/* ---------------- SD card: module dedicated SDIO pins ------------------- */
-/* 使用 SDMMC_SLOT_CONFIG_DEFAULT()（S31 默认引脚映射，见 PLAN 2.4.4）     */
+/* ---------------- SD card: module dedicated SDIO pins (PLAN 2.4.4) ---- */
+/* 官方 korvo BSP 在 GPIO 矩阵模式下显式指定（默认宏不可靠）：
+ * CLK=IO24 / CMD=IO25 / D0~D3=IO20~23，4-bit 总线 */
+#define BSP_SD_CLK_GPIO             GPIO_NUM_24
+#define BSP_SD_CMD_GPIO             GPIO_NUM_25
+#define BSP_SD_D0_GPIO              GPIO_NUM_20
+#define BSP_SD_D1_GPIO              GPIO_NUM_21
+#define BSP_SD_D2_GPIO              GPIO_NUM_22
+#define BSP_SD_D3_GPIO              GPIO_NUM_23
 
 /* ---------------- Buttons: SW3~5, 10k pull-up, active low (PLAN 2.4.5) -- */
 #define BSP_BTN1_GPIO               GPIO_NUM_55
@@ -103,7 +112,7 @@ extern "C" {
 #define BSP_ES8389_I2C_ADDR         0x20U   /* 8-bit 写地址（esp_codec_dev 用） */
 #define BSP_ES8389_I2C_ADDR_7BIT    0x10U   /* 7-bit 地址（i2c_master 总线用） */
 #define BSP_QMI8658_ADDR_A          0x6AU
-#define BSP_QMI8658_ADDR_B          0x68U
+#define BSP_QMI8658_ADDR_B          0x6BU   /* SA0 选项 0x6A/0x6B（0x68 无效） */
 
 #ifdef __cplusplus
 }

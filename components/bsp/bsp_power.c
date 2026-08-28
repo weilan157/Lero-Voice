@@ -20,11 +20,41 @@
 
 #define TAG "bsp_power"
 
-#define ADC_RAW_MAX         4095U
-#define ADC_REF_MV          3300U
+/* S31 新一代 SAR ADC：17-bit、DB_0 满量程 2000 mV（官方 esp32_s31_adc_calibration.c
+ * 模型：BSP_S31_ADC_BIT_COUNT=17、MAX_MV=2000、raw 掩码 0x1FFFF）。
+ * S31 不支持 curve fitting 校准（ADC_CALI_SCHEME_CURVE_FITTING_SUPPORTED 为假），
+ * 且官方 regi2c 软件校准仅支持 ADC1（本板 BAT/BUS 在 ADC2）——
+ * 用官方"理想 bit 权重"模型做近似换算（误差极小，绝对值 ≤ 数十 mV）。 */
+#define ADC_RAW_MASK        0x1FFFFU
+#define ADC_MAX_MV          2000
+#define ADC_BIT_COUNT       17
 #define CHARGER_VBUS_MV     4500U
 #define BAT_FULL_MV         4200U
 #define BAT_EMPTY_MV        3000U
+
+/* 官方理想 bit 权重（Q8 定点；esp32_s31_adc_calibration.c s_ideal_weights） */
+static const int32_t s_adc_ideal_weights[ADC_BIT_COUNT] = {
+    2048, 1024, 512, 256, 256, 128, 64, 32, 32, 16, 8, 8, 4, 2, 2, 0, 1,
+};
+
+static uint32_t s_adc_raw_to_mv(int raw)
+{
+    const uint32_t r = (uint32_t)raw & ADC_RAW_MASK;
+    int32_t code_q = 0;
+    for (int i = 0; i < ADC_BIT_COUNT; i++) {
+        if ((r & (1U << (ADC_BIT_COUNT - 1 - i))) != 0U) {
+            code_q += s_adc_ideal_weights[i];
+        }
+    }
+    int64_t mv = (int64_t)ADC_MAX_MV -
+                 ((int64_t)4000 * code_q) / (4393 * 256);
+    if (mv < 0) {
+        mv = 0;
+    } else if (mv > ADC_MAX_MV) {
+        mv = ADC_MAX_MV;
+    }
+    return (uint32_t)mv;
+}
 
 static adc_oneshot_unit_handle_t s_adc;
 static adc_cali_handle_t s_cali;
@@ -49,7 +79,8 @@ static esp_err_t s_adc_read_channel(adc_channel_t channel, uint32_t *mv)
         }
         *mv = (voltage > 0) ? (uint32_t)voltage : 0U;
     } else {
-        *mv = ((uint32_t)raw * ADC_REF_MV) / ADC_RAW_MAX;
+        /* S31：17-bit / DB_0 满量程 2000 mV 理想权重换算（见 s_adc_raw_to_mv） */
+        *mv = s_adc_raw_to_mv(raw);
     }
     return ESP_OK;
 }
@@ -184,7 +215,12 @@ esp_err_t bsp_power_get_charge_state(bool *charging)
     if (err != ESP_OK) {
         return err;
     }
-    *charging = (bus_mv >= CHARGER_VBUS_MV);
+    /* 充电判定：总线电压达到充电器阈值，或 ADC 已饱和
+     * （DB_0 满量程 2000 mV；1:2 分压下 4.0V 即饱和——
+     * 饱和说明 VBUS 高于分压量程，必然有充电器接入） */
+    const uint32_t bus_saturated =
+        ((uint32_t)ADC_MAX_MV * (uint32_t)CONFIG_LERO_BUS_DIVIDER_RATIO) / 100U;
+    *charging = (bus_mv >= CHARGER_VBUS_MV) || (bus_mv >= bus_saturated);
     return ESP_OK;
 }
 

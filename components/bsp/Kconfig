@@ -91,10 +91,19 @@ config LERO_BUS_ADC_CHANNEL
 config LERO_BAT_DIVIDER_RATIO
     int "Battery divider ratio x100 (200 = 1/2)"
     default 200
+    help
+        Software divider assumption for BAT_ADC. NOTE: S31 ADC DB_0 full
+        scale is 2000 mV (17-bit); with 1/2 divider a 4.2 V battery reads
+        2.1 V (saturates at 2.0 V). Set per the actual schematic resistors
+        and verify on hardware.
 
 config LERO_BUS_DIVIDER_RATIO
     int "Bus divider ratio x100 (200 = 1/2)"
     default 200
+    help
+        Software divider assumption for BUS_ADC. With 1/2 divider a 5 V
+        VBUS saturates the 2000 mV ADC scale (charging detection then uses
+        the saturation heuristic). Set per the actual schematic resistors.
 
 config LERO_BAT_LOW_MV
     int "Low battery threshold (mV)"
