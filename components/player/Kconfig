@@ -9,6 +9,20 @@ config LERO_PLAYER_TASK_STACK
     int "Player internal task stack (bytes)"
     default 6144
 
+config LERO_PLAYER_CTRL_TASK_PRIORITY
+    int "Player control task priority (loop replay)"
+    default 3
+    range 1 18
+
+config LERO_PLAYER_CTRL_TASK_STACK
+    int "Player control task stack (bytes)"
+    default 2048
+
+config LERO_PLAYER_CTRL_TASK_CORE
+    int "Player control task core (0=PRO_CPU, 1=APP_CPU)"
+    default 1
+    range 0 1
+
 config LERO_PLAYER_DEFAULT_VOLUME
     int "Default playback volume (0-100)"
     default 60

@@ -50,7 +50,7 @@ static esp_codec_dev_handle_t s_codec;
 static bool s_enabled;
 static bool s_connected;
 static bool s_streaming;
-static bool s_codec_open;
+static volatile bool s_codec_open;   /* 跨任务（BT 栈回调 vs 状态回调） */
 static uint32_t s_sample_rate;
 
 static esp_err_t s_open_codec(uint32_t sample_rate)
@@ -89,7 +89,10 @@ static void s_close_codec(void)
     }
 }
 
-/* A2DP PCM 数据回调（Bluedroid 内部已解码 SBC；A2DP 任务上下文） */
+/* A2DP PCM 数据回调（Bluedroid 内部已解码 SBC；BT 栈任务上下文）。
+ * 注意：esp_codec_dev_write 为阻塞写（I2S DMA），短时阻塞可接受；
+ * 若 BT 栈饥饿需改 ring buffer + 独立音频任务（官方 korvo 方案）。
+ * s_codec_open 为 volatile，避免 SUSPEND/DISCONNECTED 关闭后写已关设备 */
 static void s_pcm_data(const uint8_t *buf, uint32_t len)
 {
     if (!s_codec_open || (buf == NULL) || (len == 0U)) {

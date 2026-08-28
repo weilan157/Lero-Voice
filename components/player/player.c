@@ -58,6 +58,23 @@ static player_event_cb_t s_cb;
 static bool s_loop;
 static char s_loop_uri[PLAYER_URI_MAX];
 
+/* ---------------- 播放控制同步（切歌/重播竞态防护） ----------------
+ * 问题：esp_audio_simple_player_run 内部检查 state（pipeline 任务异步
+ * 更新），stop 后立即 run 有 INVALID_STATE 窗口；迟到的 STOPPED 事件
+ * 会误关新流 codec；事件回调内 run 存在自等待重入。
+ * 方案：调用者上下文 stop 后等 STOPPED 确认（s_stop_acked）再 run；
+ * 事件回调只置标志，重播由独立控制任务执行（非 pipeline 任务）。 */
+static TaskHandle_t s_ctrl_task;
+static StaticTask_t s_ctrl_tcb;
+static StackType_t s_ctrl_stack[CONFIG_LERO_PLAYER_CTRL_TASK_STACK / sizeof(StackType_t)];
+static volatile bool s_stop_requested;  /* 切歌中：下一次 STOPPED 视为 ack */
+static volatile bool s_stop_acked;      /* STOPPED 已落地 */
+static volatile bool s_loop_pending;    /* 事件回调请求重播 */
+static uint32_t s_gen;                  /* 播放代次（每次 run 递增） */
+static uint32_t s_active_gen;           /* 当前活跃流代次 */
+static volatile uint32_t s_last_run_tick;   /* 最近一次 run 的 tick（陈旧 STOPPED 抑制） */
+#define PLAYER_STALE_STOP_MS  250U      /* run 后此窗口内的 STOPPED 视为陈旧 */
+
 /* ---------------- URL 下载任务 ---------------- */
 #define PLAYER_DL_NAME_MAX   64U     /* 文件名上限（FAT 长文件名支持，且
                                       * 保证 /sdcard/download/<name> 总长
@@ -102,6 +119,7 @@ static void s_finish(player_state_t state)
 
 static void s_finish(player_state_t state);
 static esp_err_t s_play_uri(const char *uri, bool loop);   /* 定义在下方，s_event 先引用 */
+static void s_ctrl_task_fn(void *arg);                     /* 播放控制任务（循环重播） */
 
 static int s_event(esp_asp_event_pkt_t *event, void *ctx)
 {
@@ -153,20 +171,25 @@ static int s_event(esp_asp_event_pkt_t *event, void *ctx)
             }
             break;
         case ESP_ASP_STATE_STOPPED:
-            s_finish(PLAYER_STATE_FINISHED);
+            /* 切歌：本事件作为 stop 的 ack（不 s_finish，codec 留给新流）。
+             * 手动 stop：正常 s_finish（关 codec）。
+             * 陈旧 STOPPED（ack 超时后 run 已发出）：run 后短窗口内忽略。 */
+            s_stop_acked = true;
+            if (s_stop_requested) {
+                s_stop_requested = false;
+            } else if ((xTaskGetTickCount() - s_last_run_tick) >
+                       pdMS_TO_TICKS(PLAYER_STALE_STOP_MS)) {
+                s_finish(PLAYER_STATE_FINISHED);
+            }
             break;
         case ESP_ASP_STATE_FINISHED:
             if (s_loop && (s_loop_uri[0] != '\0')) {
-                /* 循环模式：完整重开而不是复用旧 codec —— I2S 停止→重启的
-                 * 时钟间隙会让 BCLK PIN 模式的 ES8389 失锁（噪声随机），
-                 * 每次重播都走 set_fmt + set_fs + enable 全新初始化 */
-                char uri[PLAYER_URI_MAX];
-                (void)strlcpy(uri, s_loop_uri, sizeof(uri));
-                ESP_LOGI(TAG, "loop: replaying %s", uri);
-                s_finish(PLAYER_STATE_IDLE);
-                if (s_play_uri(uri, true) != ESP_OK) {
-                    ESP_LOGE(TAG, "loop replay failed");
-                    s_finish(PLAYER_STATE_ERROR);
+                /* 循环模式：事件回调只置标志，由控制任务执行完整重开
+                 * （避免在 pipeline 任务上下文重入 run；完整重开防
+                 * I2S 时钟间隙失锁噪声） */
+                s_loop_pending = true;
+                if (s_ctrl_task != NULL) {
+                    (void)xTaskNotifyGive(s_ctrl_task);
                 }
             } else {
                 s_finish(PLAYER_STATE_FINISHED);
@@ -211,12 +234,19 @@ esp_err_t player_init(void)
     err = esp_audio_simple_player_set_event(s_player, s_event, NULL);
     if (err != ESP_GMF_ERR_OK) {
         ESP_LOGE(TAG, "set event failed: %d", (int)err);
+        (void)esp_audio_simple_player_destroy(s_player);
+        s_player = NULL;
         return ESP_FAIL;
     }
     s_state = PLAYER_STATE_IDLE;
     (void)player_set_volume((uint8_t)CONFIG_LERO_PLAYER_DEFAULT_VOLUME);
     /* 内存 WAV 播放 VFS（/mem，无 SD 时 rec 回放用） */
     (void)player_memfs_init();
+    /* 播放控制任务（循环重播，避免在 pipeline 任务上下文重入 run） */
+    s_ctrl_task = xTaskCreateStaticPinnedToCore(
+        s_ctrl_task_fn, "player_ctrl", (uint32_t)(sizeof(s_ctrl_stack) / sizeof(StackType_t)),
+        NULL, CONFIG_LERO_PLAYER_CTRL_TASK_PRIORITY, s_ctrl_stack, &s_ctrl_tcb,
+        CONFIG_LERO_PLAYER_CTRL_TASK_CORE);
     ESP_LOGI(TAG, "player ready (esp_audio_simple_player)");
     return ESP_OK;
 }
@@ -243,15 +273,13 @@ static esp_err_t s_build_uri(const char *path, char *uri, size_t uri_size)
     return ESP_OK;
 }
 
-/* 内部播放入口：uri 为完整 file:// URI；loop 指定是否循环 */
-static esp_err_t s_play_uri(const char *uri, bool loop)
+/* 内部播放入口：uri 为完整 URI；loop 指定是否循环。
+ * 注意：只在"调用者上下文"（console/voice/BT 焦点）调用，
+ * 事件回调（pipeline 任务）不得调用——重播走 s_ctrl_task。 */
+static esp_err_t s_run_uri(const char *uri, bool loop)
 {
     if ((s_player == NULL) || (uri == NULL)) {
         return ESP_ERR_INVALID_STATE;
-    }
-    /* 若正在播放，先停止（会关闭 codec，下一次 run 重新打开） */
-    if (s_state == PLAYER_STATE_PLAYING || s_state == PLAYER_STATE_PAUSED) {
-        (void)esp_audio_simple_player_stop(s_player);
     }
     s_loop = loop;
     if (loop) {
@@ -259,6 +287,9 @@ static esp_err_t s_play_uri(const char *uri, bool loop)
     } else {
         s_loop_uri[0] = '\0';
     }
+    s_gen++;
+    s_active_gen = s_gen;
+    s_last_run_tick = (uint32_t)xTaskGetTickCount();
     esp_gmf_err_t gerr = esp_audio_simple_player_run(s_player, uri, NULL);
     if (gerr != ESP_GMF_ERR_OK) {
         ESP_LOGE(TAG, "run %s failed: %d", uri, (int)gerr);
@@ -267,6 +298,58 @@ static esp_err_t s_play_uri(const char *uri, bool loop)
     }
     ESP_LOGI(TAG, "playing %s%s", uri, loop ? " (loop)" : "");
     return ESP_OK;
+}
+
+/* 停止当前播放并等待 STOPPED 事件落地（避免迟到事件误伤新流） */
+static void s_stop_current(void)
+{
+    if (s_state != PLAYER_STATE_PLAYING && s_state != PLAYER_STATE_PAUSED) {
+        return;
+    }
+    s_stop_requested = true;
+    s_stop_acked = false;
+    (void)esp_audio_simple_player_stop(s_player);
+    for (int i = 0; (i < 50) && !s_stop_acked; i++) {
+        vTaskDelay(pdMS_TO_TICKS(10U));
+    }
+    s_stop_requested = false;
+    s_stop_acked = false;
+}
+
+/* 控制任务：消费事件回调的请求（循环重播），避免 pipeline 任务重入 */
+static void s_ctrl_task_fn(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        uint32_t notify = 0U;
+        (void)xTaskNotifyWait(0U, UINT32_MAX, &notify, pdMS_TO_TICKS(500U));
+        if (!s_loop_pending) {
+            continue;
+        }
+        s_loop_pending = false;
+        if ((s_loop_uri[0] == '\0') || (s_player == NULL)) {
+            continue;
+        }
+        char uri[PLAYER_URI_MAX];
+        (void)strlcpy(uri, s_loop_uri, sizeof(uri));
+        ESP_LOGI(TAG, "loop: replaying %s", uri);
+        /* 完整重开：先关 codec/功放（I2S 时钟间隙防失锁），再重新 run */
+        s_finish(PLAYER_STATE_IDLE);
+        if (s_run_uri(uri, true) != ESP_OK) {
+            ESP_LOGE(TAG, "loop replay failed");
+            s_finish(PLAYER_STATE_ERROR);
+        }
+    }
+}
+
+/* 公开入口：正在播放则先同步停止，再开新流（消除切歌竞态） */
+static esp_err_t s_play_uri(const char *uri, bool loop)
+{
+    if ((s_player == NULL) || (uri == NULL)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    s_stop_current();
+    return s_run_uri(uri, loop);
 }
 
 esp_err_t player_play_file(const char *path)
@@ -325,13 +408,16 @@ esp_err_t player_play_mem(const uint8_t *data, size_t size)
     if ((data == NULL) || (size < 44U) || (s_player == NULL)) {
         return ESP_ERR_INVALID_STATE;
     }
+    /* 先停当前播放（等 STOPPED 落地）再换 memfs 数据指针：
+     * 否则 pipeline 任务正读旧数据时换底导致播放错乱 */
+    s_stop_current();
     esp_err_t err = player_memfs_set_data(data, size);
     if (err != ESP_OK) {
         return err;
     }
     /* 走 file IO + /mem VFS：不碰 SD，纯内存播放（WAV 由扩展名选择解码器）。
      * 三斜杠：get_mount_path 才能解析出绝对路径 /mem/rec.wav */
-    return s_play_uri("file:///mem/rec.wav", false);
+    return s_run_uri("file:///mem/rec.wav", false);
 }
 
 esp_err_t player_stop(void)

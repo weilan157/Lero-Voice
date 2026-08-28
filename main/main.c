@@ -173,6 +173,9 @@ static void s_ota_task(void *arg)
                 (void)ota_service_cancel();
                 break;
             default:
+                /* 非 OTA 事件（按键等）被本任务抢先收到：放回队列，
+                 * 由 sys_task 消费（两任务共用一个队列，避免事件丢失） */
+                (void)xQueueSendToBack(s_event_queue, &event, 0U);
                 break;
             }
         } else {
@@ -232,6 +235,12 @@ static void s_sys_task(void *arg)
             }
             break;
         }
+        case APP_EVT_OTA_CHECK:
+        case APP_EVT_OTA_CONFIRM:
+        case APP_EVT_OTA_ABORT:
+            /* OTA 事件被本任务抢先收到：放回队列由 ota_task 处理 */
+            (void)xQueueSendToBack(s_event_queue, &event, 0U);
+            break;
         default:
             break;
         }

@@ -61,6 +61,8 @@ static int s_listen_fd = -1;
 static char s_ap_ssid[32];
 static StackType_t s_task_stack[AP_TASK_STACK_BYTES / sizeof(StackType_t)];
 static StaticTask_t s_task_tcb;
+static volatile bool s_stop_requested;  /* stop：请求 AP 任务退出 */
+static volatile bool s_task_active;     /* AP 任务存活（start 前须确认退出） */
 
 static void s_ap_task(void *arg);
 
@@ -188,20 +190,32 @@ static void s_ap_task(void *arg)
 {
     (void)arg;
     for (;;) {
+        if (s_stop_requested) {
+            break;
+        }
         struct sockaddr_in from;
         socklen_t from_len = sizeof(from);
         const int fd = accept(s_listen_fd, (struct sockaddr *)&from, &from_len);
         if (fd < 0) {
             break;                  /* listen socket 已关闭 -> 退出 */
         }
+        /* recv 带超时：stop 请求可在阻塞中周期性唤醒任务 */
+        struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
+        (void)setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
         char req[REQ_BUF_SIZE];
         const int n = recv(fd, req, sizeof(req) - 1U, 0);
         if (n > 0) {
             req[n] = '\0';
             s_handle_request(fd, req);
+        } else if (s_stop_requested) {
+            (void)close(fd);
+            break;
         }
         (void)close(fd);
     }
+    /* 任务退出路径复位标志（供 start 复用静态 TCB/栈前确认） */
+    s_running = false;
+    s_task_active = false;
     vTaskDelete(NULL);
 }
 
@@ -209,6 +223,17 @@ esp_err_t prov_softap_start(void)
 {
     if (s_running) {
         return ESP_OK;
+    }
+    /* 异常残留任务（非 stop 路径退出失败）：先等其退出再复用静态栈 */
+    if (s_task_active) {
+        ESP_LOGW(TAG, "ap task still active, waiting for exit");
+        for (int i = 0; (i < 300) && s_task_active; i++) {
+            vTaskDelay(pdMS_TO_TICKS(10U));
+        }
+        if (s_task_active) {
+            ESP_LOGE(TAG, "ap task failed to exit; abort start");
+            return ESP_FAIL;
+        }
     }
     uint8_t mac[6] = { 0 };
     (void)esp_wifi_get_mac(WIFI_IF_AP, mac);
@@ -258,6 +283,8 @@ esp_err_t prov_softap_start(void)
     }
 
     s_running = true;
+    s_stop_requested = false;
+    s_task_active = true;
     xTaskCreateStaticPinnedToCore(s_ap_task, "prov_ap", sizeof(s_task_stack), NULL,
                                   AP_TASK_PRIORITY, s_task_stack, &s_task_tcb,
                                   AP_TASK_CORE);
@@ -267,11 +294,16 @@ esp_err_t prov_softap_start(void)
 
 esp_err_t prov_softap_stop(void)
 {
-    s_running = false;
+    s_stop_requested = true;
     if (s_listen_fd >= 0) {
         (void)close(s_listen_fd);
         s_listen_fd = -1;
     }
+    /* 等待任务真正退出（最多 2 s），避免复用静态 TCB/栈创建新任务 */
+    for (int i = 0; (i < 200) && s_task_active; i++) {
+        vTaskDelay(pdMS_TO_TICKS(10U));
+    }
+    s_stop_requested = false;
     (void)esp_wifi_stop();
     return ESP_OK;
 }

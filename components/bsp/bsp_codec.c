@@ -95,27 +95,39 @@ static esp_err_t s_i2s_init(void)
     err = i2s_channel_init_std_mode(s_i2s_tx, &std_cfg);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "i2s tx std init failed: %s", esp_err_to_name(err));
-        return err;
+        goto fail;
     }
     err = i2s_channel_init_std_mode(s_i2s_rx, &std_cfg);    /* RX 同格式（共享时钟域） */
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "i2s rx std init failed: %s", esp_err_to_name(err));
-        return err;
+        goto fail;
     }
     err = i2s_channel_enable(s_i2s_tx);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "i2s tx enable failed: %s", esp_err_to_name(err));
-        return err;
+        goto fail;
     }
     err = i2s_channel_enable(s_i2s_rx);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "i2s rx enable failed: %s", esp_err_to_name(err));
-        return err;
+        goto fail;
     }
     ESP_LOGI(TAG, "i2s ready (sclk=%d ws=%d dout=%d din=%d, no mclk: BCLK PIN mode)",
              (int)BSP_I2S_SCLK_GPIO, (int)BSP_I2S_LRCK_GPIO,
              (int)BSP_I2S_DSDIN_GPIO, (int)BSP_I2S_SDOUT_GPIO);
     return ESP_OK;
+
+fail:
+    /* 失败回滚：删除通道并复位句柄，保证重试走完整初始化 */
+    if (s_i2s_tx != NULL) {
+        (void)i2s_del_channel(s_i2s_tx);
+        s_i2s_tx = NULL;
+    }
+    if (s_i2s_rx != NULL) {
+        (void)i2s_del_channel(s_i2s_rx);
+        s_i2s_rx = NULL;
+    }
+    return err;
 }
 
 esp_err_t bsp_codec_init(void)
@@ -139,6 +151,7 @@ esp_err_t bsp_codec_init(void)
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "codec 7-bit 0x10 no ACK (%s); 排查 AUD_3V3 供电 / 地址 / I2C0 上拉",
                  esp_err_to_name(err));
+        (void)i2c_master_bus_rm_device(probe);   /* 失败清理，避免残留句柄 */
         return err;
     }
     s_present = true;

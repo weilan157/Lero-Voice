@@ -98,11 +98,13 @@ esp_err_t bsp_imu_init(void)
             ESP_LOGI(TAG, "QMI8658A found at 0x%02X", (unsigned)addrs[i]);
             break;
         }
+        /* 探测失败：立即移除句柄（避免总线上残留 + 重试累积泄漏） */
+        (void)i2c_master_bus_rm_device(dev);
         err = ESP_ERR_NOT_FOUND;
     }
 
     if (!s_present) {
-        ESP_LOGW(TAG, "QMI8658A not found (0x6A/0x68); check SA0 wiring");
+        ESP_LOGW(TAG, "QMI8658A not found (0x6A/0x6B); check SA0 wiring");
         return ESP_ERR_NOT_FOUND;
     }
 

@@ -18,6 +18,7 @@
 #include <string.h>
 #include "sdkconfig.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
 #include "bsp_sdcard.h"
 #include "diag_internal.h"
 
@@ -61,6 +62,10 @@ static void s_pending_append(const char *data, size_t len)
     }
 }
 
+/* 日志 hook 会在任意任务上下文被调用：ring/pending 共享缓冲
+ * 用自旋锁保护（短临界区，避免多任务并发写撕裂） */
+static portMUX_TYPE s_log_lock = portMUX_INITIALIZER_UNLOCKED;
+
 static int s_vprintf_hook(const char *fmt, va_list args)
 {
     char line[LOG_LINE_MAX];
@@ -73,8 +78,10 @@ static int s_vprintf_hook(const char *fmt, va_list args)
     }
     /* 输出到串口（vfs 写，不会递归回 vprintf） */
     (void)fwrite(line, 1U, (size_t)n, stdout);
+    portENTER_CRITICAL(&s_log_lock);
     s_ring_append(line, (size_t)n);
     s_pending_append(line, (size_t)n);
+    portEXIT_CRITICAL(&s_log_lock);
     return n;
 }
 
@@ -115,9 +122,13 @@ static void s_write_pending_to_file(const char *path)
             return;
         }
     }
-    (void)fwrite(s_pending, 1U, s_pending_len, f);
-    (void)fclose(f);
+    /* 临界区取出待刷数据（写文件期间 hook 继续 append 到新缓冲） */
+    portENTER_CRITICAL(&s_log_lock);
+    const size_t flush_len = s_pending_len;
     s_pending_len = 0U;
+    portEXIT_CRITICAL(&s_log_lock);
+    (void)fwrite(s_pending, 1U, flush_len, f);
+    (void)fclose(f);
 }
 
 esp_err_t diag_log_flush(void)
