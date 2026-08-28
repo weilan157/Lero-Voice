@@ -284,8 +284,8 @@
 1. **上电时序**：VCI 上电 → RESET 低 ≥10 µs → 拉高等待 5 ms → 显示数据流
 2. **初始化命令（MIPI-DBI 类）**：`0x11` Sleep Out（等 120 ms）→ `0x36` 方向 → `0x3A=0x66`（18-bit）→ `0x29` Display ON
    - ⚠️ **初始化命令走 SPI（CS/SCL/SDI = 模组引脚 9/10/8?），本板未接**（引脚 7~11 悬空）→ **依赖模组 OTP 出厂配置**（多数中景园模组出厂已烧录，上电即显示）；若 OTP 未配置需飞线 SPI 补初始化
-3. **RGB 时序**：PCLK 周期 ≥28 ns（≤35.7 MHz）；720×720@60Hz 典型 **~31 MHz**；PCLK 上升沿采样、VS/HS/DE 高有效（极性不符可经 RGB 控制寄存器调整）
-4. **HSYNC/VSYNC 计算**：HSYNC = PCLK/(720+H_Blank)，VSYNC = HSYNC/(720+V_Blank)（H_Blank≈100、V_Blank≈30 为估算值，精确值以规格书时序为准）
+3. **RGB 时序（✅ 上板实测 2026-08-28，厂商官方源码值）**：**PCLK=16 MHz**、**H: HSW=60/HBP=120/HFP=106**、**V: VSW=4/VBP=20/VFP=20**，PCLK **上升沿**采样、VS/HS/DE 高有效——**~20.8 fps**，显示正常。⚠️ 31 MHz 超出面板 OTP 配置（花屏/水平分裂/垂直滚动）；Adafruit 5793 参数（2/44/46、16/16/50）对本模组会垂直滚动，不适用
+4. **HSYNC/VSYNC 单位**：HSW/HBP/HFP 单位 PCLK，VSW/VBP/VFP 单位行（Kconfig `LERO_LCD_*` 可调；滚动方向与 V 总行数的关系：向上翻=输出帧周期偏小）
 
 ##### 触摸（FT6336U）控制参数
 
@@ -300,8 +300,8 @@
 ##### 对本板 BSP 的影响（待改）
 
 - 分辨率：**480×854 → 720×720**（Kconfig `LERO_LCD_H_RES/V_RES`、帧缓冲 720×720×2B×2≈2.1 MB PSRAM ✓ 16 MB 充足）
-- PCLK：16 MHz → **~31 MHz**（Kconfig `LERO_LCD_PIXEL_CLOCK_HZ`）
-- 消隐期：按规格书时序调整（当前 Kconfig 默认 10/20/20/10/20/20 需核对）
+- PCLK：16 MHz → **16 MHz（厂商源码值；31 MHz 会花屏，见上）**（Kconfig `LERO_LCD_PIXEL_CLOCK_HZ`）
+- 消隐期：**厂商源码值 H:60/120/106、V:4/20/20（上板显示正常）**
 - 触摸：按 FT6336U 地址 0x38 探测（BSP 目前未知地址，需上板扫描）
 
 #### 2.4.2e LVGL 集成检查（2026-08-27，对照官方 S31 例程 `docs/ESP32_S31_20260711/`）
