@@ -35,6 +35,10 @@ static size_t s_last_words_len;
 static char s_pending[PENDING_FLUSH_SIZE];
 static size_t s_pending_len;
 static uint8_t s_log_file_index;
+/* 日志 hook 会在任意任务上下文被调用：ring/pending 共享缓冲
+ * 用自旋锁保护（短临界区，避免多任务并发写撕裂） */
+static portMUX_TYPE s_log_lock = portMUX_INITIALIZER_UNLOCKED;
+static volatile bool s_flushing;    /* 写盘期间为 true（hook 跳过 pending） */
 
 static void s_ring_append(const char *data, size_t len)
 {
@@ -65,11 +69,6 @@ static void s_pending_append(const char *data, size_t len)
         s_pending_len += len;
     }
 }
-
-/* 日志 hook 会在任意任务上下文被调用：ring/pending 共享缓冲
- * 用自旋锁保护（短临界区，避免多任务并发写撕裂） */
-static portMUX_TYPE s_log_lock = portMUX_INITIALIZER_UNLOCKED;
-static volatile bool s_flushing;    /* 写盘期间为 true（hook 跳过 pending） */
 
 static int s_vprintf_hook(const char *fmt, va_list args)
 {
