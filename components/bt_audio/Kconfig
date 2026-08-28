@@ -1,0 +1,11 @@
+menu "Lero Voice Bluetooth Audio (A2DP sink)"
+
+config LERO_BT_AUDIO_ENABLE
+    bool "Enable Bluetooth Classic A2DP music playback"
+    default y
+    help
+        Stream music from a phone over BT Classic A2DP to the ES8389
+        (S31 supports BT Classic; Bluedroid decodes SBC, PCM goes to the
+        shared codec). Requires CONFIG_BT_ENABLED / Bluedroid / A2DP.
+
+endmenu

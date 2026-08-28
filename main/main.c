@@ -31,6 +31,7 @@
 #include "player.h"
 #include "voice.h"
 #include "ui.h"
+#include "bt_audio.h"
 #include "diag.h"
 
 #define TAG "main"
@@ -277,6 +278,10 @@ void app_main(void)
     /* LVGL UI（上电跑官方 benchmark demo 显示 FPS；失败仅降级，不影响其余功能） */
     if (ui_init() != ESP_OK) {
         ESP_LOGW(TAG, "ui init failed (降级：无界面)");
+    }
+    /* 蓝牙 A2DP 音乐播放（手机连接即播；失败仅降级） */
+    if (bt_audio_init() != ESP_OK) {
+        ESP_LOGW(TAG, "bt audio init failed (降级：无蓝牙播放)");
     }
 
     /* 开机自动连接已保存的 WiFi 配置；无配置则自动进入配网模式（PLAN 4.3） */

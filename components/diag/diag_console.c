@@ -42,6 +42,7 @@
 #include "player.h"
 #include "voice.h"
 #include "voice_internal.h"
+#include "bt_audio.h"
 #include "diag.h"
 #include "diag_internal.h"
 
@@ -477,6 +478,24 @@ static int cmd_codec(int argc, char **argv)
     return 0;
 }
 
+static int cmd_bt(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    bt_audio_state_t st;
+    if (bt_audio_get_state(&st) != ESP_OK) {
+        printf("bt: n/a\n");
+        return 1;
+    }
+    printf("bt: %s / %s / %s / codec=%s / %lu Hz\n",
+           st.enabled ? "enabled" : "disabled",
+           st.connected ? "connected" : "idle",
+           st.streaming ? "streaming" : "no-stream",
+           st.codec_open ? "open" : "closed",
+           (unsigned long)st.sample_rate);
+    return 0;
+}
+
 static int cmd_bl(int argc, char **argv)
 {
     if (argc != 2) {
@@ -708,6 +727,7 @@ esp_err_t diag_console_register(void)
         { .command = "codec",    .help = "ES8389 register dump",          .hint = NULL, .func = cmd_codec },
         { .command = "power",    .help = "battery/bus voltage + charging",.hint = NULL, .func = cmd_power },
         { .command = "bl",       .help = "backlight duty 0-100%% (BL_EN IO54)", .hint = NULL, .func = cmd_bl },
+        { .command = "bt",       .help = "BT A2DP sink state (connect phone & play)", .hint = NULL, .func = cmd_bt },
         { .command = "touch",    .help = "FT6336U status + coordinates",  .hint = NULL, .func = cmd_touch },
     };
     for (size_t i = 0U; i < (sizeof(s_cmds) / sizeof(s_cmds[0])); i++) {
