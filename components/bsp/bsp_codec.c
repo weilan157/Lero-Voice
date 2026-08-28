@@ -91,6 +91,10 @@ static esp_err_t s_i2s_init(void)
             },
         },
     };
+    /* 时钟源用音频 PLL（APLL）：XTAL 40MHz 无法整除 44.1kHz 系时钟
+     * （MCLK 11.2896MHz），默认时钟源分频抖动大（~91%），播放/蓝牙
+     * 44.1kHz 音频出现杂音失真——上板实测 APLL 修复（48k 同理受益） */
+    std_cfg.clk_cfg.clk_src = I2S_CLK_SRC_APLL;
     std_cfg.clk_cfg.mclk_multiple = CODEC_MCLK_MULTIPLE;
     err = i2s_channel_init_std_mode(s_i2s_tx, &std_cfg);
     if (err != ESP_OK) {
@@ -183,11 +187,14 @@ esp_err_t bsp_codec_init(void)
         return ESP_FAIL;
     }
 
-    /* 4. 数据接口：I2S 通道句柄（TX 播放 + RX 录音） */
+    /* 4. 数据接口：I2S 通道句柄（TX 播放 + RX 录音）。
+     *    时钟源 APLL：esp_codec_dev 按音频采样率精确合成 BCLK/MCLK
+     *    （44.1k 系需 APLL，XTAL 分频抖动 ~91% 致杂音——上板实测） */
     audio_codec_i2s_cfg_t i2s_cfg = {
         .port = CODEC_I2S_PORT,
         .rx_handle = s_i2s_rx,
         .tx_handle = s_i2s_tx,
+        .clk_src = I2S_CLK_SRC_APLL,
     };
     const audio_codec_data_if_t *data_if = audio_codec_new_i2s_data(&i2s_cfg);
     if (data_if == NULL) {

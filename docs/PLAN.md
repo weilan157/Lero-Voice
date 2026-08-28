@@ -1024,6 +1024,7 @@ I2C:  SDA(IO0)/SCL(IO1) → ES8389 控制 (0x20)，与 QMI8658A(0x6A) 共用总�
 - **codec 生命周期**：收到 `MUSIC_INFO` 事件（采样率/声道/位深）→ **无条件按最新 fs 重配**（close+open，防切歌陈旧 info 误导）→ 功放使能；`STOPPED/FINISHED/ERROR` → 关 codec → 功放关闭（防爆音，3.3.1 #3）；**循环模式每次重播完整重开**（I2S 停止→重启时钟间隙会使 BCLK PIN 模式 ES8389 失锁产生噪声，故不跨曲保持打开）
 - **控制入口**：diag console 命令 `play / play-loop / play-url（HTTP 流式）/ play-dl（下载）/ stop / pause / resume / vol / player`；后续接 UI 与语音意图
 - ✅ **无需 MCLK**：ES8389 采用官方驱动的 **BCLK PIN 模式**（`no_mclk=true`，REG0x02[7:6]=01，时钟从 I2S BCLK 派生；驱动按 BCLK=fs×bits×2 查 coeff_div 系数表，16bit/2ch 时 BCLK=32×fs 与表匹配）。原理图 pin4(MCLK/TDMIN) 与 DACDAT 短接共接 I2S_DSDIN 为省 MCLK 设计，BCLK 模式下无影响。上板实测项：`es8389_codec_cfg_t` 子配置（`sys_cfg.is_master=false` 从模式、`no_mclk=true`、`adc_cfg` 模拟麦、`pa_cfg.pa_pin=-1` 交由 bsp_amplifier 防双控；I2S 双通道 TX+RX 支持录音）
+- ✅ **I2S 时钟源 = APLL（上板实测 2026-08-28）**：默认 XTAL（40MHz）无法整除 44.1kHz 系时钟（MCLK 11.2896MHz），分频抖动 ~91% → 44.1kHz 播放/蓝牙 A2DP 杂音失真；改用音频 PLL（`s_i2s_init` 的 `clk_cfg.clk_src=I2S_CLK_SRC_APLL` + `audio_codec_i2s_cfg_t.clk_src`）后 APLL 精确合成 44.1k/48k 时钟，杂音消除（48k 同样受益）
 
 ### 6.3 录音 → WAV → 回放（已实现，`components/voice/`；默认内存模式，无需 SD）
 
