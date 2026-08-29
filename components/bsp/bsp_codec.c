@@ -108,8 +108,21 @@ static esp_err_t s_i2s_init(void)
         ESP_LOGE(TAG, "i2s rx std init failed: %s", esp_err_to_name(err));
         goto fail;
     }
-    /* 不在此处 i2s_channel_enable：通道使能与 APLL 频率配置由
-     * esp_codec_dev 的 data_if 在 open/read/write 时完成 */
+    /* 仿官方 korvo BSP（esp32_s31_korvo.c bsp_audio_init）：初始化即 enable
+     * TX/RX。BCLK PIN 模式下 ES8389 时钟从 I2S BCLK 派生，TX(master) 常开
+     * 保证 BCLK 持续输出——录音（RX）无需额外使能时钟即有数据。
+     * 初始时钟用默认源（不占 APLL，保留 44.1k 杂音修复）；播放 44.1k 时
+     * data_if 会 disable 后按 APLL 重新配置（_set_drv_fs 处理 enabled 态）。 */
+    err = i2s_channel_enable(s_i2s_tx);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "i2s tx enable failed: %s", esp_err_to_name(err));
+        goto fail;
+    }
+    err = i2s_channel_enable(s_i2s_rx);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "i2s rx enable failed: %s", esp_err_to_name(err));
+        goto fail;
+    }
     ESP_LOGI(TAG, "i2s ready (sclk=%d ws=%d dout=%d din=%d, no mclk: BCLK PIN mode)",
              (int)BSP_I2S_SCLK_GPIO, (int)BSP_I2S_LRCK_GPIO,
              (int)BSP_I2S_DSDIN_GPIO, (int)BSP_I2S_SDOUT_GPIO);

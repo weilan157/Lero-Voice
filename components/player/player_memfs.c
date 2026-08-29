@@ -10,7 +10,7 @@
  *
  * Registers an esp_vfs mount at "/mem" exposing a single read-only file
  * "rec.wav". esp_audio_simple_player's file IO then opens
- * "file://mem/rec.wav" through the standard VFS layer, so audio recorded
+ * "file:///mem/rec.wav" through the standard VFS layer, so audio recorded
  * into a PSRAM buffer can be played back with no SD card at all
  * (docs/PLAN.md 6.2 / console "rec" / "play-mem").
  *
@@ -31,7 +31,10 @@
 #define TAG "player_memfs"
 
 #define MEMFS_MOUNT       "/mem"
-#define MEMFS_PATH        "/mem/rec.wav"
+/* esp_vfs 回调收到的 path 已剥离挂载前缀（保留前导 '/'）：
+ * open("/mem/rec.wav") → vfs.open 收到 "/rec.wav"，
+ * 因此这里必须用相对挂载点的路径，否则永远 ENOENT（实测 rec 自动回放失败） */
+#define MEMFS_PATH        "/rec.wav"
 #define MEMFS_LOCAL_FD    0   /* VFS 层分配的本地 fd（单文件，恒为 0） */
 
 static const uint8_t *s_data;   /* WAV 数据指针（由调用方持有生命周期） */
