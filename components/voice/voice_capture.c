@@ -81,10 +81,14 @@ voice_capture_result_t voice_capture_run(volatile bool *stop)
         .channel = CONFIG_LERO_VOICE_CHANNELS,
         .bits_per_sample = 16,
     };
-    /* 播放器可能已打开同格式 codec：打开失败时直接读（双工共享） */
+    /* 播放器可能已打开同格式 codec：打开失败时直接读（双工共享）。
+     * 官方方式：BSP 初始化时 I2S TX/RX 常开（BCLK 持续输出，ES8389
+     * 时钟始终有效），此处无需额外管理时钟 */
     const bool opened = (esp_codec_dev_open(s_codec, &fs) == ESP_CODEC_DEV_OK);
     if (!opened) {
         ESP_LOGD(TAG, "codec already open (player active); reading shared duplex");
+    } else {
+        (void)esp_codec_dev_set_in_gain(s_codec, CONFIG_LERO_VOICE_MIC_GAIN_DB);
     }
 
     const int64_t start_us = esp_timer_get_time();
@@ -97,10 +101,10 @@ voice_capture_result_t voice_capture_run(volatile bool *stop)
         if ((esp_timer_get_time() - start_us) >= timeout_us) {
             break;
         }
-        /* esp_codec_dev 2.x：read 返回 0 = 成功（读满帧），负值 = 错误 */
-        const int got = esp_codec_dev_read(s_codec, s_pcm, FRAME_BYTES);
-        if (got < 0) {
-            vTaskDelay(pdMS_TO_TICKS(2U));  /* 错误：稍候重试 */
+        /* esp_codec_dev_read 成功返回 ESP_CODEC_DEV_OK(0)，非字节数；
+         * 数据按请求长度写入 s_pcm（见 audio_codec_data_i2s.c _i2s_data_read） */
+        if (esp_codec_dev_read(s_codec, s_pcm, FRAME_BYTES) != ESP_CODEC_DEV_OK) {
+            vTaskDelay(pdMS_TO_TICKS(2U));  /* 读取失败：稍候重试 */
             continue;
         }
         const size_t samples = FRAME_SAMPLES;
@@ -166,18 +170,14 @@ static void s_wav_fill_header(uint8_t *hdr, uint32_t sample_rate,
     hdr[7] = (uint8_t)((riff_size >> 24) & 0xFFU);
     (void)memcpy(&hdr[8], "WAVE", 4U);
     (void)memcpy(&hdr[12], "fmt ", 4U);
-    /* 标准 44 字节布局（此前 PCM 写在 18-19、fmt 段左移 2 字节，
-     * 解析器在 20-21 读到 channels 值误报 format——上板实测修复）：
-     *   16-19: fmt chunk size = 16（4 字节）
-     *   20-21: audio format = 1 (PCM)
-     *   22-23: channels；24-27: sample rate；28-31: byte rate
-     *   32-33: block align；34-35: bits per sample
-     *   36-39: "data"；40-43: data size */
-    hdr[16] = 16U;
+    /* 标准 WAV 44 字节头：fmt chunk size 占 16..19，fmt 数据从 20 开始：
+     * 20-21 audio format, 22-23 channels, 24-27 sample rate,
+     * 28-31 byte rate, 32-33 block align, 34-35 bits per sample */
+    hdr[16] = 16U;                      /* fmt chunk size = 16 */
     hdr[17] = 0U;
     hdr[18] = 0U;
     hdr[19] = 0U;
-    hdr[20] = 1U;                       /* audio format: PCM */
+    hdr[20] = 1U;                       /* WAVE_FORMAT_PCM */
     hdr[21] = 0U;
     hdr[22] = (uint8_t)(channels & 0xFFU);
     hdr[23] = (uint8_t)((channels >> 8) & 0xFFU);
@@ -242,7 +242,9 @@ esp_err_t voice_capture_record_run(uint32_t seconds, const char *path,
         }
     }
 
-    /* 打开 codec IN（与聆听同格式，共享时钟域）；播放器占用时共享双工 */
+    /* 打开 codec IN（与聆听同格式，共享时钟域）；播放器占用时共享双工。
+     * 官方方式：BSP 初始化时 I2S TX/RX 常开（BCLK 持续输出），
+     * 此处无需额外管理时钟 */
     esp_codec_dev_sample_info_t fs = {
         .sample_rate = CONFIG_LERO_VOICE_SAMPLE_RATE,
         .channel = CONFIG_LERO_VOICE_CHANNELS,
@@ -251,6 +253,8 @@ esp_err_t voice_capture_record_run(uint32_t seconds, const char *path,
     const bool opened = (esp_codec_dev_open(s_codec, &fs) == ESP_CODEC_DEV_OK);
     if (!opened) {
         ESP_LOGD(TAG, "record: codec already open; reading shared duplex");
+    } else {
+        (void)esp_codec_dev_set_in_gain(s_codec, CONFIG_LERO_VOICE_MIC_GAIN_DB);
     }
 
     /* 先写占位头，录完回填 */
@@ -274,29 +278,27 @@ esp_err_t voice_capture_record_run(uint32_t seconds, const char *path,
         if ((esp_timer_get_time() - start_us) >= duration_us) {
             break;
         }
-        /* esp_codec_dev 2.x 语义：read 返回 0 = 成功（按 len 读满帧），
-         * 负值 = 错误码——此前按 got<=0 当"无数据"跳过导致录 0 字节 */
-        const int got = esp_codec_dev_read(s_codec, s_pcm, FRAME_BYTES);
-        if (got < 0) {
+        if (esp_codec_dev_read(s_codec, s_pcm, FRAME_BYTES) != ESP_CODEC_DEV_OK) {
             vTaskDelay(pdMS_TO_TICKS(2U));
             continue;
         }
+        const size_t got = FRAME_BYTES;   /* 成功即读满一帧 */
         if (mem_mode) {
-            if ((wav_pos + FRAME_BYTES) > out_cap) {   /* 溢出保护 */
+            if ((wav_pos + got) > out_cap) {   /* 溢出保护 */
                 ESP_LOGE(TAG, "record: in-RAM buffer full");
                 io_error = true;
                 break;
             }
-            (void)memcpy(&out_buf[wav_pos], s_pcm, FRAME_BYTES);
-            wav_pos += FRAME_BYTES;
+            (void)memcpy(&out_buf[wav_pos], s_pcm, got);
+            wav_pos += got;
         } else {
-            if (fwrite(s_pcm, 1U, FRAME_BYTES, fp) != FRAME_BYTES) {
+            if (fwrite(s_pcm, 1U, got, fp) != got) {
                 ESP_LOGE(TAG, "record: write failed (SD full?)");
                 io_error = true;
                 break;
             }
         }
-        data_size += FRAME_BYTES;
+        data_size += (uint32_t)got;
     }
 
     /* 回填 WAV 头（data_size 已知） */

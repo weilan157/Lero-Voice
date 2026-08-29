@@ -31,6 +31,14 @@ config LERO_VOICE_LISTEN_TIMEOUT_MS
     int "Max listen duration (ms)"
     default 10000
 
+config LERO_VOICE_MIC_GAIN_DB
+    int "Microphone input gain (dB, ES8389 ADC PGA)"
+    default 30
+    range 0 36
+    help
+        ES8389 analog input PGA gain applied on capture open
+        (esp_codec_dev_set_in_gain), matches official korvo factory_demo.
+
 config LERO_VOICE_VAD_RMS_THRESHOLD
     int "VAD RMS threshold (16-bit PCM; higher = less sensitive)"
     default 400
