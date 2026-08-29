@@ -148,6 +148,32 @@ config LERO_SD_BASE_PATH
     string "SD card mount point"
     default "/sdcard"
 
+config LERO_SD_AUTOMOUNT
+    bool "SD card auto-mount background task (hotplug)"
+    default y
+    help
+        Periodically probe the SD card: insert -> auto mount, remove ->
+        auto unmount. Needed because SD_DET is not wired (no hot-plug
+        interrupt, PLAN 3.3.1 #6). Disable to keep the deferred-mount
+        behavior (mount triggered by player / ota-sd via poll()).
+
+config LERO_SD_POLL_PERIOD_MS
+    int "SD auto-mount poll period (ms)"
+    default 2000
+    range 200 60000
+    depends on LERO_SD_AUTOMOUNT
+
+config LERO_SD_TASK_STACK_SIZE
+    int "SD auto-mount task stack size (bytes)"
+    default 4096
+    depends on LERO_SD_AUTOMOUNT
+
+config LERO_SD_TASK_PRIORITY
+    int "SD auto-mount task priority"
+    default 5
+    range 1 25
+    depends on LERO_SD_AUTOMOUNT
+
 config LERO_STORAGE_BASE_PATH
     string "Storage (SPIFFS) mount point"
     default "/storage"
