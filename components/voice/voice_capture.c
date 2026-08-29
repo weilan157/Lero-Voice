@@ -97,14 +97,15 @@ voice_capture_result_t voice_capture_run(volatile bool *stop)
         if ((esp_timer_get_time() - start_us) >= timeout_us) {
             break;
         }
+        /* esp_codec_dev 2.x：read 返回 0 = 成功（读满帧），负值 = 错误 */
         const int got = esp_codec_dev_read(s_codec, s_pcm, FRAME_BYTES);
-        if (got <= 0) {
-            vTaskDelay(pdMS_TO_TICKS(2U));  /* 无数据：稍候重试 */
+        if (got < 0) {
+            vTaskDelay(pdMS_TO_TICKS(2U));  /* 错误：稍候重试 */
             continue;
         }
-        const size_t samples = (size_t)got / 2U;
+        const size_t samples = FRAME_SAMPLES;
         res.frames++;
-        res.bytes += (uint32_t)got;
+        res.bytes += FRAME_BYTES;
 
         const bool speech = s_frame_has_speech(s_pcm, samples);
         if (speech) {
@@ -165,24 +166,33 @@ static void s_wav_fill_header(uint8_t *hdr, uint32_t sample_rate,
     hdr[7] = (uint8_t)((riff_size >> 24) & 0xFFU);
     (void)memcpy(&hdr[8], "WAVE", 4U);
     (void)memcpy(&hdr[12], "fmt ", 4U);
-    hdr[16] = 16U;                      /* fmt chunk size = 16 */
+    /* 标准 44 字节布局（此前 PCM 写在 18-19、fmt 段左移 2 字节，
+     * 解析器在 20-21 读到 channels 值误报 format——上板实测修复）：
+     *   16-19: fmt chunk size = 16（4 字节）
+     *   20-21: audio format = 1 (PCM)
+     *   22-23: channels；24-27: sample rate；28-31: byte rate
+     *   32-33: block align；34-35: bits per sample
+     *   36-39: "data"；40-43: data size */
+    hdr[16] = 16U;
     hdr[17] = 0U;
-    hdr[18] = 1U;                       /* PCM */
+    hdr[18] = 0U;
     hdr[19] = 0U;
-    hdr[20] = (uint8_t)(channels & 0xFFU);
-    hdr[21] = (uint8_t)((channels >> 8) & 0xFFU);
-    hdr[22] = (uint8_t)(sample_rate & 0xFFU);
-    hdr[23] = (uint8_t)((sample_rate >> 8) & 0xFFU);
-    hdr[24] = (uint8_t)((sample_rate >> 16) & 0xFFU);
-    hdr[25] = (uint8_t)((sample_rate >> 24) & 0xFFU);
-    hdr[26] = (uint8_t)(byte_rate & 0xFFU);
-    hdr[27] = (uint8_t)((byte_rate >> 8) & 0xFFU);
-    hdr[28] = (uint8_t)((byte_rate >> 16) & 0xFFU);
-    hdr[29] = (uint8_t)((byte_rate >> 24) & 0xFFU);
-    hdr[30] = (uint8_t)(block_align & 0xFFU);
-    hdr[31] = (uint8_t)((block_align >> 8) & 0xFFU);
-    hdr[32] = (uint8_t)(bits & 0xFFU);
-    hdr[33] = (uint8_t)((bits >> 8) & 0xFFU);
+    hdr[20] = 1U;                       /* audio format: PCM */
+    hdr[21] = 0U;
+    hdr[22] = (uint8_t)(channels & 0xFFU);
+    hdr[23] = (uint8_t)((channels >> 8) & 0xFFU);
+    hdr[24] = (uint8_t)(sample_rate & 0xFFU);
+    hdr[25] = (uint8_t)((sample_rate >> 8) & 0xFFU);
+    hdr[26] = (uint8_t)((sample_rate >> 16) & 0xFFU);
+    hdr[27] = (uint8_t)((sample_rate >> 24) & 0xFFU);
+    hdr[28] = (uint8_t)(byte_rate & 0xFFU);
+    hdr[29] = (uint8_t)((byte_rate >> 8) & 0xFFU);
+    hdr[30] = (uint8_t)((byte_rate >> 16) & 0xFFU);
+    hdr[31] = (uint8_t)((byte_rate >> 24) & 0xFFU);
+    hdr[32] = (uint8_t)(block_align & 0xFFU);
+    hdr[33] = (uint8_t)((block_align >> 8) & 0xFFU);
+    hdr[34] = (uint8_t)(bits & 0xFFU);
+    hdr[35] = (uint8_t)((bits >> 8) & 0xFFU);
     (void)memcpy(&hdr[36], "data", 4U);
     hdr[40] = (uint8_t)(data_size & 0xFFU);
     hdr[41] = (uint8_t)((data_size >> 8) & 0xFFU);
@@ -264,27 +274,29 @@ esp_err_t voice_capture_record_run(uint32_t seconds, const char *path,
         if ((esp_timer_get_time() - start_us) >= duration_us) {
             break;
         }
+        /* esp_codec_dev 2.x 语义：read 返回 0 = 成功（按 len 读满帧），
+         * 负值 = 错误码——此前按 got<=0 当"无数据"跳过导致录 0 字节 */
         const int got = esp_codec_dev_read(s_codec, s_pcm, FRAME_BYTES);
-        if (got <= 0) {
+        if (got < 0) {
             vTaskDelay(pdMS_TO_TICKS(2U));
             continue;
         }
         if (mem_mode) {
-            if ((wav_pos + (size_t)got) > out_cap) {   /* 溢出保护 */
+            if ((wav_pos + FRAME_BYTES) > out_cap) {   /* 溢出保护 */
                 ESP_LOGE(TAG, "record: in-RAM buffer full");
                 io_error = true;
                 break;
             }
-            (void)memcpy(&out_buf[wav_pos], s_pcm, (size_t)got);
-            wav_pos += (size_t)got;
+            (void)memcpy(&out_buf[wav_pos], s_pcm, FRAME_BYTES);
+            wav_pos += FRAME_BYTES;
         } else {
-            if (fwrite(s_pcm, 1U, (size_t)got, fp) != (size_t)got) {
+            if (fwrite(s_pcm, 1U, FRAME_BYTES, fp) != FRAME_BYTES) {
                 ESP_LOGE(TAG, "record: write failed (SD full?)");
                 io_error = true;
                 break;
             }
         }
-        data_size += (uint32_t)got;
+        data_size += FRAME_BYTES;
     }
 
     /* 回填 WAV 头（data_size 已知） */

@@ -31,7 +31,10 @@
 #define TAG "player_memfs"
 
 #define MEMFS_MOUNT       "/mem"
-#define MEMFS_PATH        "/mem/rec.wav"
+/* VFS 回调收到的 path 是剥离挂载点后的相对路径（带前导 '/'）：
+ * fopen("/mem/rec.wav") → 回调收到 "/rec.wav"（上板实测；此前匹配
+ * 完整路径 "/mem/rec.wav" 导致 ENOENT、回放打不开） */
+#define MEMFS_PATH        "/rec.wav"
 #define MEMFS_LOCAL_FD    0   /* VFS 层分配的本地 fd（单文件，恒为 0） */
 
 static const uint8_t *s_data;   /* WAV 数据指针（由调用方持有生命周期） */
