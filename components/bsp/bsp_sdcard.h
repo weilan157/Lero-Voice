@@ -9,7 +9,10 @@
  * @brief MicroSD card (SDIO 4-bit, module dedicated pins).
  *
  * SD_DET is not wired to the MCU (docs/PLAN.md 2.6 #2): no hot-plug
- * interrupt; use bsp_sdcard_poll() / UI triggered mount (PLAN 3.3.1 #6).
+ * interrupt. A static polling task (bsp_sdcard_task, Kconfig
+ * LERO_SD_AUTOMOUNT / LERO_SD_POLL_PERIOD_MS, default 2 s) probes the
+ * slot: insert → auto mount, removal (CMD13 status failure) → auto
+ * unmount. bsp_sdcard_poll() remains for synchronous mount requests.
  */
 
 #ifndef BSP_SDCARD_H

@@ -148,6 +148,31 @@ config LERO_SD_BASE_PATH
     string "SD card mount point"
     default "/sdcard"
 
+config LERO_SD_AUTOMOUNT
+    bool "SD card hot-plug polling (auto mount/unmount)"
+    default y
+    help
+        No SD_DET pin on this board (PLAN 2.6 #2): a static polling task
+        probes the slot periodically — inserts auto-mount, removal
+        (CMD13 status failure) auto-unmount.
+
+config LERO_SD_POLL_PERIOD_MS
+    int "SD hot-plug poll period (ms)"
+    default 2000
+    range 200 60000
+    depends on LERO_SD_AUTOMOUNT
+
+config LERO_SD_TASK_STACK_SIZE
+    int "SD poll task stack (bytes)"
+    default 4096
+    depends on LERO_SD_AUTOMOUNT
+
+config LERO_SD_TASK_PRIORITY
+    int "SD poll task priority"
+    default 5
+    range 1 18
+    depends on LERO_SD_AUTOMOUNT
+
 config LERO_STORAGE_BASE_PATH
     string "Storage (SPIFFS) mount point"
     default "/storage"
