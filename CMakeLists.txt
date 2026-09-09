@@ -21,5 +21,5 @@ project(Lero-Voice)
 # 功能——提供该宏定义（S31 ADC1/ADC2 各 8 通道）使组件通过编译。
 # 仅对 SOC_ADC_CHANNEL_NUM 缺失的芯片生效，不影响其它目标。
 if(IDF_TARGET STREQUAL "esp32s31")
-    add_compile_definitions(SOC_ADC_CHANNEL_NUM(x)=8)
+    add_compile_definitions("SOC_ADC_CHANNEL_NUM(x)=8")
 endif()
